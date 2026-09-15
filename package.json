@@ -17,6 +17,7 @@
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
 		"@iconify-json/lucide": "^1.2.132",
+		"@sveltejs/adapter-bun": "1.0.0-next.2",
 		"@sveltejs/kit": "^3.0.0-next.27",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"@tailwindcss/vite": "^4.3.3",
@@ -30,7 +31,6 @@
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
 		"svelte": "^5.57.0",
-		"svelte-adapter-bun": "^1.0.1",
 		"svelte-check": "^4.7.6",
 		"tailwindcss": "^4.3.3",
 		"typescript": "^6.0.3",

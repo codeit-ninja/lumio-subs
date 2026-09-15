@@ -10,10 +10,12 @@ const configSchema = z.object({
 	R2_ENDPOINT: z.string().optional(),
 	/** Public base URL for objects, e.g. https://pub-xxx.r2.dev or https://subs.example.com */
 	R2_PUBLIC_BASE_URL: z.string().url(),
-	WORKER_RATE_PER_SECOND: z.coerce.number().positive().default(10),
-	WORKER_BATCH_SIZE: z.coerce.number().int().positive().default(20),
+	WORKER_RATE_PER_SECOND: z.coerce.number().positive().default(2),
+	WORKER_BATCH_SIZE: z.coerce.number().int().positive().default(5),
 	WORKER_MAX_RETRIES: z.coerce.number().int().nonnegative().default(5),
-	WORKER_CONCURRENCY: z.coerce.number().int().positive().default(4),
+	WORKER_CONCURRENCY: z.coerce.number().int().positive().default(1),
+	/** Pause all downloads when OpenSubtitles Anubis keeps rejecting (seconds). */
+	WORKER_ANUBIS_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(900),
 	LOG_LEVEL: z.string().default('info')
 });
 

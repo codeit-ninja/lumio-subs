@@ -6,7 +6,7 @@ Private archive pipeline: **Postgres** (metadata) + **Cloudflare R2** (gzipped s
 
 - Bun (local) or Docker
 - Cloudflare R2 bucket + S3 API token
-- Root stack running (`flaresolverr` + `opensubtitles-scraper` at ~10 req/s)
+- Root stack running (`flaresolverr` + `opensubtitles-scraper`; keep scraper ≤ ~2 req/s to avoid Anubis)
 
 ## Local setup
 
@@ -75,7 +75,9 @@ R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
 R2_BUCKET=opensubtitles-mirror
 OPENSUBTITLES_SCRAPER_URL=http://opensubtitles-scraper:8000
-WORKER_RATE_PER_SECOND=10
+WORKER_RATE_PER_SECOND=2
+WORKER_CONCURRENCY=1
+WORKER_ANUBIS_COOLDOWN_SECONDS=900
 METADATA_DUMP_URL=https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
 R2_PUBLIC_BASE_URL=https://pub-xxxxxxxx.r2.dev
 ```
@@ -110,7 +112,11 @@ bun run import-metadata -- ./data/subtitles_all.txt.gz
 
 Note: `dl.opensubtitles.org` sits behind Cloudflare; downloads from a VPS/datacenter IP can fail or challenge. If that happens, download elsewhere and mount the file, or set `METADATA_DUMP_PATH` to an already-present file.
 
-Expect **~12 days** ideal at 10 req/s; **2–4+ weeks** realistic. Budget **~200–300 GB** R2.
+Expect **months** at a safe ~1–2 req/s on a datacenter IP (Anubis soft-bans faster rates). Budget **~200–300 GB** R2.
+
+### Anubis soft-ban
+
+If scraper logs show `Anubis challenge persists after fresh solve` / `Cached Anubis cookies rejected`, **stop the worker** and wait several hours. The PoW “succeeds” but the cookie is rejected — the IP is blocked, not the solver. The worker detects this, leases failed rows for `WORKER_ANUBIS_COOLDOWN_SECONDS` (default 15 min), and pauses the loop. After a ban, wait longer (hours) and resume at `WORKER_CONCURRENCY=1` / `WORKER_RATE_PER_SECOND=1`.
 
 ## Inspect the database
 

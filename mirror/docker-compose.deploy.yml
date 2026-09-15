@@ -29,10 +29,11 @@ services:
         condition: service_healthy
     environment:
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
-      - SCRAPER_MIN_REQUEST_INTERVAL=0.1
-      - SCRAPER_RATE_LIMIT_PER_MINUTE=600
-      - SCRAPER_MAX_CONCURRENT_REQUESTS=10
-      - SCRAPER_MAX_INFLIGHT_REQUESTS=20
+      # Stay under Anubis soft-ban (datacenter IPs get blocked fast at ~10/s)
+      - SCRAPER_MIN_REQUEST_INTERVAL=0.5
+      - SCRAPER_RATE_LIMIT_PER_MINUTE=120
+      - SCRAPER_MAX_CONCURRENT_REQUESTS=1
+      - SCRAPER_MAX_INFLIGHT_REQUESTS=2
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s
@@ -92,10 +93,12 @@ services:
       R2_BUCKET: ${R2_BUCKET:-opensubtitles-mirror}
       R2_ENDPOINT: ${R2_ENDPOINT:-}
       R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL}
-      WORKER_RATE_PER_SECOND: ${WORKER_RATE_PER_SECOND:-10}
-      WORKER_BATCH_SIZE: ${WORKER_BATCH_SIZE:-20}
+      # Keep low — OpenSubtitles Anubis soft-bans datacenter IPs at ~10/s
+      WORKER_RATE_PER_SECOND: ${WORKER_RATE_PER_SECOND:-2}
+      WORKER_BATCH_SIZE: ${WORKER_BATCH_SIZE:-5}
       WORKER_MAX_RETRIES: ${WORKER_MAX_RETRIES:-5}
-      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+      WORKER_ANUBIS_COOLDOWN_SECONDS: ${WORKER_ANUBIS_COOLDOWN_SECONDS:-900}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     command: ['worker']
 

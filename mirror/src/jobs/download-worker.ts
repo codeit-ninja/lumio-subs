@@ -44,6 +44,16 @@ function scrapeUrl(row: SubtitleRow): string {
 	);
 }
 
+function isAnubisError(message: string): boolean {
+	const m = message.toLowerCase();
+	return (
+		m.includes('anubis') ||
+		m.includes('.within.website') ||
+		m.includes('challenge persists') ||
+		(m.includes('502') && m.includes('bad gateway'))
+	);
+}
+
 async function claimBatch(limit: number, maxRetries: number): Promise<SubtitleRow[]> {
 	const result = await getPool().query<SubtitleRow>(
 		`
@@ -99,19 +109,29 @@ async function markStored(
 	);
 }
 
-async function markFailed(externalId: string, error: string): Promise<void> {
+/** Mark failed; Anubis hits get a long lease so we do not immediately re-claim them. */
+async function markFailed(
+	externalId: string,
+	error: string,
+	cooldownSeconds: number
+): Promise<boolean> {
+	const anubis = isAnubisError(error);
 	await getPool().query(
 		`
 		UPDATE subtitles
 		SET
 			status = 'failed',
 			error = $2,
-			lease_until = NULL,
+			lease_until = CASE
+				WHEN $3 THEN NOW() + make_interval(secs => $4)
+				ELSE NULL
+			END,
 			updated_at = NOW()
 		WHERE external_id = $1
 		`,
-		[externalId, error.slice(0, 1000)]
+		[externalId, error.slice(0, 1000), anubis, cooldownSeconds]
 	);
+	return anubis;
 }
 
 async function bumpStats(stored: number, failed: number): Promise<void> {
@@ -144,7 +164,7 @@ async function processOne(
 	r2: S3Client,
 	cfg: Config,
 	limiter: RateLimiter
-): Promise<'stored' | 'failed' | 'skipped'> {
+): Promise<'stored' | 'failed' | 'skipped' | 'anubis'> {
 	const key = storageKeyFor(row.external_id);
 	const r2Url = publicUrlFor(cfg.R2_PUBLIC_BASE_URL, key);
 
@@ -162,9 +182,9 @@ async function processOne(
 		return 'stored';
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
-		await markFailed(row.external_id, message);
-		log.warn({ externalId: row.external_id, err: message }, 'download failed');
-		return 'failed';
+		const anubis = await markFailed(row.external_id, message, cfg.WORKER_ANUBIS_COOLDOWN_SECONDS);
+		log.warn({ externalId: row.external_id, err: message, anubis }, 'download failed');
+		return anubis ? 'anubis' : 'failed';
 	}
 }
 
@@ -190,6 +210,7 @@ async function workerLoop(): Promise<void> {
 			rate: cfg.WORKER_RATE_PER_SECOND,
 			concurrency: cfg.WORKER_CONCURRENCY,
 			batch: cfg.WORKER_BATCH_SIZE,
+			anubisCooldownSec: cfg.WORKER_ANUBIS_COOLDOWN_SECONDS,
 			bucket: cfg.R2_BUCKET,
 			publicBase: cfg.R2_PUBLIC_BASE_URL
 		},
@@ -207,6 +228,7 @@ async function workerLoop(): Promise<void> {
 		let stored = 0;
 		let failed = 0;
 		let skipped = 0;
+		let anubisHits = 0;
 
 		const queue = [...batch];
 		const runners = Array.from(
@@ -217,15 +239,28 @@ async function workerLoop(): Promise<void> {
 					if (!row) return;
 					const result = await processOne(row, lavx, r2, cfg, limiter);
 					if (result === 'stored') stored += 1;
-					else if (result === 'failed') failed += 1;
-					else skipped += 1;
+					else if (result === 'skipped') skipped += 1;
+					else if (result === 'anubis') {
+						anubisHits += 1;
+						failed += 1;
+					} else failed += 1;
 				}
 			}
 		);
 
 		await Promise.all(runners);
 		await bumpStats(stored + skipped, failed);
-		log.info({ claimed: batch.length, stored, failed, skipped }, 'batch complete');
+		log.info({ claimed: batch.length, stored, failed, skipped, anubisHits }, 'batch complete');
+
+		// OpenSubtitles soft-ban: stop hammering until cooldown elapses.
+		if (anubisHits > 0) {
+			const sec = cfg.WORKER_ANUBIS_COOLDOWN_SECONDS;
+			log.warn(
+				{ anubisHits, sleepSec: sec },
+				'Anubis block detected — pausing worker so the IP can cool down'
+			);
+			await Bun.sleep(sec * 1000);
+		}
 	}
 }
 

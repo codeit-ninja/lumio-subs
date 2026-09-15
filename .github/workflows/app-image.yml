@@ -1,0 +1,87 @@
+name: App Docker images
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'pocketbase/pb_migrations/**'
+      - 'pocketbase/pb_hooks/**'
+      - 'pocketbase/Dockerfile'
+      - '.github/workflows/app-image.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: app-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: App image metadata
+        id: app_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/lumio-subs
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+            type=ref,event=branch
+
+      - name: PocketBase image metadata
+        id: pb_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/lumio-subs-pocketbase
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+            type=ref,event=branch
+
+      - name: Build and push app
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.app_meta.outputs.tags }}
+          labels: ${{ steps.app_meta.outputs.labels }}
+          cache-from: type=gha,scope=lumio-subs-app
+          cache-to: type=gha,mode=max,scope=lumio-subs-app
+          provenance: false
+
+      - name: Build and push PocketBase
+        uses: docker/build-push-action@v6
+        with:
+          context: pocketbase
+          file: pocketbase/Dockerfile
+          push: true
+          tags: ${{ steps.pb_meta.outputs.tags }}
+          labels: ${{ steps.pb_meta.outputs.labels }}
+          cache-from: type=gha,scope=lumio-subs-pb
+          cache-to: type=gha,mode=max,scope=lumio-subs-pb
+          provenance: false

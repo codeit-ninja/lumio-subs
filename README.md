@@ -6,7 +6,7 @@ Not Wyzie-compatible — own API contract. Intended as a self-hosted replacement
 
 ## Stack
 
-- SvelteKit 5 + Bun adapter
+- SvelteKit 5 + `@sveltejs/adapter-bun`
 - neverthrow services, Zod transforms
 - bits-ui + Iconify UI
 - PocketBase (+ [pocketbase-schema-generator](https://github.com/satohshi/pocketbase-schema-generator) under `pocketbase/pb_hooks/`)
@@ -94,3 +94,25 @@ Search stores **metadata only**; the subtitle body is downloaded lazily on first
 | `OPENSUBTITLES_SCRAPER_URL`   | LavX scraper base URL (default `http://127.0.0.1:8000`) |
 | `SUBDL_API_KEY`               | Optional SubDL API key (skipped when empty)             |
 | `PB_ADMIN_EMAIL` / `PASSWORD` | Server-side PocketBase auth for cache writes            |
+
+## Production (Docker)
+
+Workflow [`.github/workflows/app-image.yml`](.github/workflows/app-image.yml) builds and pushes:
+
+- `ghcr.io/<owner>/lumio-subs` — SvelteKit app (Bun)
+- `ghcr.io/<owner>/lumio-subs-pocketbase` — PocketBase + migrations/hooks
+
+Triggers: push to the default branch touching app/PocketBase paths, or manual **workflow_dispatch**.
+
+```bash
+# on the host (private GHCR)
+echo YOUR_PAT | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+
+cp .env.example .env   # set TMDB_*, PB_ADMIN_*, ORIGIN, APP_IMAGE, POCKETBASE_IMAGE
+docker compose -f docker-compose.prod.yml up -d
+```
+
+- App: http://127.0.0.1:3000 (or `APP_PORT`)
+- PocketBase admin: http://127.0.0.1:8093 (or `PB_PORT`)
+
+Set `ORIGIN` to the public HTTPS URL (or rely on `PROTOCOL_HEADER` / `HOST_HEADER` behind a reverse proxy). Inside the compose network the app talks to PocketBase at `http://pocketbase:8090` and the scraper at `http://opensubtitles-scraper:8000`.
