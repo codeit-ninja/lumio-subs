@@ -27,10 +27,7 @@ const subtitleRowSchema = z
 		language: z.string().optional(),
 		Language: z.string().optional(),
 		version: z.string().optional(),
-		Version: z.string().optional(),
-		hearingImpaired: z.boolean().optional(),
-		HearingImpaired: z.boolean().optional(),
-		downloadCount: z.number().optional()
+		Version: z.string().optional()
 	})
 	.passthrough();
 
@@ -95,8 +92,6 @@ export class GestdownProvider implements SubtitleProvider {
 							language: (row.language ?? row.Language ?? lang).toLowerCase(),
 							format: 'srt',
 							release: row.version ?? row.Version ?? undefined,
-							hearingImpaired: row.hearingImpaired ?? row.HearingImpaired ?? false,
-							downloadCount: row.downloadCount,
 							rawUrl: `${BASE}/subtitles/download/${externalId}`,
 							download: () =>
 								fromHttpBytes(`${BASE}/subtitles/download/${externalId}`).mapErr((e) =>

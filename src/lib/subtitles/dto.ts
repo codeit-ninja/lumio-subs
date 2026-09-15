@@ -27,11 +27,8 @@ export const subtitleDtoSchema = z.object({
 	id: z.string().min(1),
 	language: z.string().min(1),
 	format: z.string().min(1),
-	provider: z.string().min(1),
 	release: z.string().nullable(),
 	fileName: z.string().nullable(),
-	hearingImpaired: z.boolean(),
-	downloadCount: z.number().nullable(),
 	downloadUrl: z.string().min(1)
 });
 

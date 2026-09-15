@@ -19,9 +19,9 @@ export const buttonVariants = tv({
 			ghost: 'bg-transparent text-muted hover:bg-surface hover:text-foreground'
 		},
 		size: {
-			sm: 'gap-2 px-3 py-1.5 text-xs xl:px-3.5 xl:py-2 xl:text-sm',
-			md: 'gap-2 px-4 py-2 text-sm xl:px-5 xl:py-2.5 xl:text-base',
-			lg: 'gap-2.5 px-5 py-2.5 text-base xl:px-6 xl:py-3 xl:text-lg'
+			sm: 'gap-2 px-3 py-0.5 text-xs xl:px-3.5 xl:py-1 xl:text-sm',
+			md: 'gap-2 px-4 py-1 text-sm xl:px-5 xl:py-1.5 xl:text-base',
+			lg: 'gap-2.5 px-5 py-1.5 text-base xl:px-6 xl:py-2 xl:text-lg'
 		}
 	},
 	defaultVariants: {

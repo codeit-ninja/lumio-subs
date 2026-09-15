@@ -1,12 +1,11 @@
 import { errAsync, okAsync, ResultAsync as RA } from 'neverthrow';
-import type { ListResult, RecordModel } from 'pocketbase';
 import { z } from 'zod';
 
 import { TMDB_API_KEY } from '$app/env/private';
 
 import { Service } from './base.service';
 import type { AppError } from './result';
-import { ERROR_CODE, fromHttp, fromPb, httpError, requireConfig } from './result';
+import { ERROR_CODE, fromHttp, httpError, requireConfig } from './result';
 
 const tmdbMovieSchema = z.object({
 	id: z.number(),
@@ -36,91 +35,49 @@ export class TmdbService extends Service {
 	}
 
 	resolveByTmdbId(tmdbId: number, typeHint?: 'movie' | 'tv'): RA<ResolvedMedia, AppError> {
-		return this.fromCache(tmdbId, typeHint).andThen((cached) => {
-			if (cached) return okAsync(cached);
-			return this.fetchAndStore(tmdbId, typeHint);
-		});
+		return this.fetchMedia(tmdbId, typeHint);
 	}
 
 	resolveByImdbId(imdbId: string): RA<ResolvedMedia, AppError> {
 		const normalized = imdbId.toLowerCase();
-		return fromPb<ListResult<RecordModel>>(
-			this.pocketbase.collection('media_ids').getList(1, 1, {
-				filter: this.pocketbase.filter('imdbId = {:imdbId}', { imdbId: normalized })
-			})
-		).andThen((list) => {
-			const row = list.items[0];
-			if (row) {
-				return okAsync({
-					tmdbId: Number(row.tmdbId),
-					imdbId: (row.imdbId as string) ?? normalized,
-					type: row.type as 'movie' | 'tv',
-					title: (row.title as string) ?? '',
-					releaseDate: (row.releaseDate as string) ?? null
-				});
-			}
 
-			if (!this.isConfigured()) {
-				return okAsync({
-					tmdbId: 0,
-					imdbId: normalized,
-					type: 'movie' as const,
-					title: '',
-					releaseDate: null
-				});
-			}
+		if (!this.isConfigured()) {
+			return okAsync({
+				tmdbId: 0,
+				imdbId: normalized,
+				type: 'movie' as const,
+				title: '',
+				releaseDate: null
+			});
+		}
 
-			return requireConfig(TMDB_API_KEY.trim(), 'TMDB_API_KEY').andThen((key) =>
-				fromHttp<{ movie_results?: { id: number }[]; tv_results?: { id: number }[] }>(
-					`https://api.themoviedb.org/3/find/${normalized}?external_source=imdb_id`,
-					{ headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } }
-				)
-					.orElse(() =>
-						fromHttp<{ movie_results?: { id: number }[]; tv_results?: { id: number }[] }>(
-							`https://api.themoviedb.org/3/find/${normalized}?api_key=${key}&external_source=imdb_id`
-						)
+		return requireConfig(TMDB_API_KEY.trim(), 'TMDB_API_KEY').andThen((key) =>
+			fromHttp<{ movie_results?: { id: number }[]; tv_results?: { id: number }[] }>(
+				`https://api.themoviedb.org/3/find/${normalized}?external_source=imdb_id`,
+				{ headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } }
+			)
+				.orElse(() =>
+					fromHttp<{ movie_results?: { id: number }[]; tv_results?: { id: number }[] }>(
+						`https://api.themoviedb.org/3/find/${normalized}?api_key=${key}&external_source=imdb_id`
 					)
-					.andThen((body) => {
-						const movieId = body.movie_results?.[0]?.id;
-						const tvId = body.tv_results?.[0]?.id;
-						if (movieId) return this.fetchAndStore(movieId, 'movie');
-						if (tvId) return this.fetchAndStore(tvId, 'tv');
-						return okAsync({
-							tmdbId: 0,
-							imdbId: normalized,
-							type: 'movie' as const,
-							title: '',
-							releaseDate: null
-						});
-					})
-			);
-		});
-	}
-
-	private fromCache(tmdbId: number, typeHint?: 'movie' | 'tv'): RA<ResolvedMedia | null, AppError> {
-		const filter = typeHint
-			? this.pocketbase.filter('tmdbId = {:tmdbId} && type = {:type}', {
-					tmdbId,
-					type: typeHint
+				)
+				.andThen((body) => {
+					const movieId = body.movie_results?.[0]?.id;
+					const tvId = body.tv_results?.[0]?.id;
+					if (movieId) return this.fetchMedia(movieId, 'movie');
+					if (tvId) return this.fetchMedia(tvId, 'tv');
+					return okAsync({
+						tmdbId: 0,
+						imdbId: normalized,
+						type: 'movie' as const,
+						title: '',
+						releaseDate: null
+					});
 				})
-			: this.pocketbase.filter('tmdbId = {:tmdbId}', { tmdbId });
-
-		return fromPb<ListResult<RecordModel>>(
-			this.pocketbase.collection('media_ids').getList(1, 1, { filter })
-		).map((list) => {
-			const row = list.items[0];
-			if (!row) return null;
-			return {
-				tmdbId: Number(row.tmdbId),
-				imdbId: (row.imdbId as string) || null,
-				type: row.type as 'movie' | 'tv',
-				title: (row.title as string) ?? '',
-				releaseDate: (row.releaseDate as string) ?? null
-			};
-		});
+		);
 	}
 
-	private fetchAndStore(tmdbId: number, typeHint?: 'movie' | 'tv'): RA<ResolvedMedia, AppError> {
+	private fetchMedia(tmdbId: number, typeHint?: 'movie' | 'tv'): RA<ResolvedMedia, AppError> {
 		if (!this.isConfigured()) {
 			return errAsync(
 				httpError(ERROR_CODE.CONFIG_MISSING, 500, 'TMDB_API_KEY required to resolve TMDB ids')
@@ -160,37 +117,13 @@ export class TmdbService extends Service {
 						const imdb = parsed.data.imdb_id ?? parsed.data.external_ids?.imdb_id ?? null;
 						const title = parsed.data.title ?? parsed.data.name ?? '';
 						const releaseDate = parsed.data.release_date ?? parsed.data.first_air_date ?? null;
-						const resolved: ResolvedMedia = {
+						return {
 							tmdbId,
 							imdbId: imdb ? imdb.toLowerCase() : null,
 							type: hit.type,
 							title,
 							releaseDate
-						};
-
-						await fromPb<RecordModel>(
-							this.pocketbase.collection('media_ids').create(
-								{
-									tmdbId,
-									imdbId: resolved.imdbId,
-									type: resolved.type,
-									title: resolved.title,
-									releaseDate: resolved.releaseDate
-								},
-								{ requestKey: this.createRequestKey() }
-							)
-						).orElse(() =>
-							fromPb<ListResult<RecordModel>>(
-								this.pocketbase.collection('media_ids').getList(1, 1, {
-									filter: this.pocketbase.filter('tmdbId = {:tmdbId} && type = {:type}', {
-										tmdbId,
-										type: resolved.type
-									})
-								})
-							).map(() => null as unknown as RecordModel)
-						);
-
-						return resolved;
+						} satisfies ResolvedMedia;
 					}
 
 					throw httpError(ERROR_CODE.TMDB_NOT_FOUND, 404, `TMDB id ${tmdbId} not found`);

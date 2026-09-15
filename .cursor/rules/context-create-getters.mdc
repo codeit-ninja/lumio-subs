@@ -1,0 +1,58 @@
+---
+description: When creating Svelte context, pass an object with getters so values stay reactive to props/load data
+globs: "**/*.{svelte,svelte.ts,svelte.js}"
+alwaysApply: false
+---
+
+# Context: create with getters
+
+When calling `createX(...)` (from `createContext`), pass an **object with `get` accessors** for every field that comes from reactive props or load data. Do not snapshot values, and do not wrap the whole object in a thunk.
+
+## Context module
+
+```ts
+import { createContext } from 'svelte';
+
+export const [useMovie, createMovie] = createContext<Movie>();
+```
+
+Order is `[useX, createX]` (get, set).
+
+## Setting context
+
+```svelte
+<!-- ✅ GOOD — getters keep reactivity across the context boundary -->
+createMovie({
+	get id() {
+		return movie.id;
+	},
+	get title() {
+		return movie.title;
+	}
+});
+
+createApp({
+	get user() {
+		return data.user;
+	},
+	get isAuthenticated() {
+		return data.user != null;
+	}
+});
+```
+
+```svelte
+<!-- ❌ BAD — snapshots / breaks reactivity -->
+createMovie(movie);
+createApp({ user: data.user });
+createApp(() => ({ user: data.user }));
+```
+
+## Reading context
+
+```svelte
+const movie = useMovie();
+const app = useApp();
+```
+
+Children read fields from the context value (`movie.title`, `app.user`) — do not re-accept those fields as props when context already provides them.

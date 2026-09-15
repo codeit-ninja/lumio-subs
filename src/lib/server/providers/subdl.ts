@@ -118,7 +118,6 @@ export class SubdlProvider implements SubtitleProvider {
 							format: guessFormat(row.name ?? release, 'srt') as ProviderHit['format'],
 							release: release ?? undefined,
 							fileName: row.name ?? undefined,
-							hearingImpaired: row.hi ?? row.hearing_impaired ?? false,
 							rawUrl: directUrl?.startsWith('http') ? directUrl : undefined,
 							download: () => this.download(apiKey, id, directUrl)
 						});

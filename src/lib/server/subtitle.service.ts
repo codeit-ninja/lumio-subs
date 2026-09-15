@@ -4,6 +4,7 @@ import type { RecordModel } from 'pocketbase';
 import type { SearchQuery, SubtitleDto } from '#lib/subtitles/dto.js';
 
 import { Service } from './base.service';
+import type { CacheLookupKey, StoredSubtitleHit } from './cache.service';
 import { CacheService } from './cache.service';
 import {
 	getProvider,
@@ -17,10 +18,12 @@ import type { ProviderHit } from './providers/types';
 import type { AppError } from './result';
 import { ERROR_CODE, formatAppError, httpError, promiseWithTimeout } from './result';
 import { ensureSubtitleBytes, toVtt } from './subtitle-format';
+import type { ResolvedMedia } from './tmdb.service';
 import { TmdbService } from './tmdb.service';
 
 const PROVIDER_TIMEOUT_MS = 12_000;
-/** Metadata rows to keep per search (files are fetched lazily on demand). */
+const DOWNLOAD_CONCURRENCY = 5;
+/** Rows to keep per search (files downloaded eagerly on scrape). */
 const MAX_HITS = 40;
 
 export class SubtitleService extends Service {
@@ -54,7 +57,7 @@ export class SubtitleService extends Service {
 			: this.tmdb().resolveByTmdbId(query.tmdb!, query.type);
 
 		return resolveMedia.andThen((media) => {
-			const key = {
+			const key: CacheLookupKey = {
 				imdbId: media.imdbId ?? query.imdb?.toLowerCase() ?? null,
 				tmdbId: media.tmdbId || query.tmdb || null,
 				season: query.s ?? null,
@@ -66,36 +69,38 @@ export class SubtitleService extends Service {
 
 			if (!query.refresh) {
 				return this.cache()
-					.findFreshSearch(key)
-					.andThen((search) => {
-						if (!search) {
-							return this.fetchAndCache(key, sources, media, mediaType, language);
+					.findByKey(key)
+					.andThen((rows) => {
+						if (rows.length === 0) {
+							return this.fetchAndStore(key, sources, media, mediaType, language);
 						}
-						return this.cache()
-							.listSubtitles(search.id)
-							.andThen((rows) => {
-								// Empty caches (e.g. OpenSubtitles without API key) must not block other providers.
-								if (rows.length === 0) {
-									return this.fetchAndCache(key, sources, media, mediaType, language);
-								}
-								return okAsync(rows.map((r) => this.toDto(r)));
-							});
+						return okAsync(rows.map((r) => this.toDto(r)));
 					});
 			}
 
-			return this.fetchAndCache(key, sources, media, mediaType, language);
+			return this.fetchAndStore(key, sources, media, mediaType, language);
 		});
 	}
 
 	getFile(
 		id: string,
 		format: 'vtt' | 'srt' = 'vtt'
-	): RA<{ body: string; contentType: string }, AppError> {
+	): RA<
+		{ kind: 'redirect'; url: string } | { kind: 'body'; body: string; contentType: string },
+		AppError
+	> {
 		return this.cache()
 			.getSubtitle(id)
 			.andThen((record) => this.ensureFile(record))
-			.andThen((record) =>
-				RA.fromPromise(
+			.andThen((record) => {
+				if (format === 'vtt') {
+					const r2Url = this.cache().r2FileUrl(record);
+					if (r2Url) {
+						return okAsync({ kind: 'redirect' as const, url: r2Url });
+					}
+				}
+
+				return RA.fromPromise(
 					this.cache()
 						.readFileText(record)
 						.then((text) => {
@@ -108,12 +113,20 @@ export class SubtitleService extends Service {
 								} satisfies AppError;
 							}
 							if (format === 'vtt') {
-								return { body: toVtt(text), contentType: 'text/vtt; charset=utf-8' };
+								return {
+									kind: 'body' as const,
+									body: toVtt(text),
+									contentType: 'text/vtt; charset=utf-8'
+								};
 							}
 							const srt = text.startsWith('WEBVTT')
 								? text.replace(/^WEBVTT\n\n?/, '').replace(/(\d{2}:\d{2}:\d{2})\.(\d{3})/g, '$1,$2')
 								: text;
-							return { body: srt, contentType: 'application/x-subrip; charset=utf-8' };
+							return {
+								kind: 'body' as const,
+								body: srt,
+								contentType: 'application/x-subrip; charset=utf-8'
+							};
 						}),
 					(e) =>
 						typeof e === 'object' && e && 'kind' in e
@@ -124,8 +137,8 @@ export class SubtitleService extends Service {
 									status: 500,
 									message: e instanceof Error ? e.message : 'Failed to read subtitle'
 								}
-				)
-			);
+				);
+			});
 	}
 
 	private ensureFile(record: RecordModel): RA<RecordModel, AppError> {
@@ -161,16 +174,10 @@ export class SubtitleService extends Service {
 		});
 	}
 
-	private fetchAndCache(
-		key: {
-			imdbId: string | null;
-			tmdbId: number | null;
-			season: number | null;
-			episode: number | null;
-			language: string;
-		},
+	private fetchAndStore(
+		key: CacheLookupKey,
 		sources: string[],
-		media: { title: string; releaseDate: string | null; imdbId: string | null; tmdbId: number },
+		media: ResolvedMedia,
 		mediaType: 'movie' | 'tv',
 		language: string
 	): RA<SubtitleDto[], AppError> {
@@ -235,16 +242,57 @@ export class SubtitleService extends Service {
 
 		return RA.combine(searches)
 			.map((groups) => this.dedupe(groups.flat()).slice(0, MAX_HITS))
-			.andThen((hits) =>
+			.andThen((hits) => this.downloadHits(hits))
+			.andThen((stored) =>
 				this.cache()
-					.replaceSearch(
-						key,
-						providers.map((p) => p.id),
-						media.releaseDate,
-						hits
-					)
+					.replaceByKey(key, { ...media, mediaType }, stored)
 					.map((rows) => rows.map((r) => this.toDto(r)))
 			);
+	}
+
+	private downloadHits(hits: ProviderHit[]): RA<StoredSubtitleHit[], AppError> {
+		return RA.fromPromise(
+			this.mapWithConcurrency(hits, DOWNLOAD_CONCURRENCY, async (hit) => {
+				const provider = getProvider(hit.provider);
+				if (!provider) {
+					return { ...hit, bytes: null };
+				}
+				const result = await provider.downloadByExternalId(hit.externalId, hit.rawUrl ?? null);
+				if (result.isErr()) {
+					return { ...hit, bytes: null };
+				}
+				try {
+					return { ...hit, bytes: ensureSubtitleBytes(result.value) };
+				} catch {
+					return { ...hit, bytes: null };
+				}
+			}),
+			(e) =>
+				httpError(
+					ERROR_CODE.SCRAPE_FAILED,
+					502,
+					e instanceof Error ? e.message : 'Failed to download subtitles'
+				)
+		);
+	}
+
+	private async mapWithConcurrency<T, R>(
+		items: T[],
+		concurrency: number,
+		fn: (item: T) => Promise<R>
+	): Promise<R[]> {
+		const results: R[] = new Array(items.length);
+		let next = 0;
+
+		const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+			while (next < items.length) {
+				const index = next++;
+				results[index] = await fn(items[index]!);
+			}
+		});
+
+		await Promise.all(workers);
+		return results;
 	}
 
 	private dedupe(hits: ProviderHit[]): ProviderHit[] {
@@ -256,20 +304,18 @@ export class SubtitleService extends Service {
 			seen.add(k);
 			out.push(hit);
 		}
-		return out.sort((a, b) => (b.downloadCount ?? 0) - (a.downloadCount ?? 0));
+		return out;
 	}
 
 	private toDto(record: RecordModel): SubtitleDto {
+		const r2Url = record.file ? this.cache().r2FileUrl(record) : null;
 		return {
 			id: record.id,
 			language: String(record.language),
 			format: String(record.format ?? 'vtt'),
-			provider: String(record.provider),
 			release: (record.release as string) ?? null,
 			fileName: (record.fileName as string) ?? null,
-			hearingImpaired: Boolean(record.hearingImpaired),
-			downloadCount: typeof record.downloadCount === 'number' ? record.downloadCount : null,
-			downloadUrl: `/api/subtitles/${record.id}`
+			downloadUrl: r2Url ?? `/api/subtitles/${record.id}`
 		};
 	}
 }

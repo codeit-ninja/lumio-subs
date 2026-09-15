@@ -8,7 +8,7 @@ import { guessFormat } from '../subtitle-format';
 import type { ProviderHit, SubtitleProvider, SubtitleQuery } from './types';
 
 const BASE = 'https://www.podnapisi.net';
-const UA = 'Mozilla/5.0 (compatible; LumioSubs/0.1)';
+const UA = 'Mozilla/5.0 (compatible; SubREST/0.1)';
 
 const hitSchema = z
 	.object({
@@ -91,7 +91,6 @@ export class PodnapisiProvider implements SubtitleProvider {
 					);
 					const releases = [...(row.releases ?? []), ...(row.custom_releases ?? [])];
 					const release = releases[0];
-					const flags = new Set((row.flags ?? []).map((f) => f.toLowerCase()));
 
 					hits.push({
 						provider: this.id,
@@ -99,8 +98,6 @@ export class PodnapisiProvider implements SubtitleProvider {
 						language: (row.language ?? lang).toLowerCase(),
 						format: guessFormat(release, 'srt') as ProviderHit['format'],
 						release,
-						hearingImpaired: flags.has('hearing_impaired'),
-						downloadCount: row.stats?.downloads,
 						rawUrl: downloadUrl,
 						download: () => this.fetchFile(downloadUrl, absoluteUrl(row.url ?? `/subtitles/${id}`))
 					});

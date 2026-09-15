@@ -117,7 +117,7 @@ function scraperRequest<T>(
 					headers: {
 						'Content-Type': 'application/json',
 						Accept: 'application/json',
-						'User-Agent': 'LumioSubs/0.1'
+						'User-Agent': 'SubREST/0.1'
 					},
 					body: JSON.stringify(body),
 					signal: controller.signal
@@ -255,8 +255,6 @@ export class OpenSubtitlesProvider implements SubtitleProvider {
 								format: guessFormat(fileName, 'srt') as ProviderHit['format'],
 								release: sub.release_name || undefined,
 								fileName,
-								hearingImpaired: sub.hearing_impaired,
-								downloadCount: sub.download_count || undefined,
 								rawUrl: downloadUrl,
 								download: () => this.downloadByExternalId(subtitleId, downloadUrl)
 							});

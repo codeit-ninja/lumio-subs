@@ -1,0 +1,76 @@
+---
+description: Compound components use Root + createX/useX context, not flat prop-drilled exports
+globs: "**/components/**/*.{svelte,ts}"
+alwaysApply: false
+---
+
+# Components: compound + context
+
+When a domain entity has multiple related UI parts (e.g. movie → title, rating, poster, genres), do **not** flat-export standalone components that each take slices of the data as props.
+
+Use a **compound component** with Svelte context: one `Root` owns the data; children read it via `useX`.
+
+## Structure
+
+```
+components/movie/
+  context.svelte.ts   # createMovie / useMovie
+  movie-root.svelte   # accepts {movie}, calls createMovie
+  movie-title.svelte  # calls useMovie(), renders title
+  …
+  index.ts            # namespace exports (Root, Title, …)
+```
+
+## Context API
+
+Always name the pair `createX` (set) and `useX` (get):
+
+```ts
+// context.svelte.ts
+import { createContext } from 'svelte';
+import type { Movie } from '#lib/…';
+
+export const [useMovie, createMovie] = createContext<Movie>();
+```
+
+- `createMovie({ get id() { … }, … })` — call only in `Root`; pass **getters** (see `context-create-getters` rule), not a plain snapshot
+- `useMovie()` — call in every child part; do not accept the entity (or its fields) as props when context already provides them
+
+## Namespace exports
+
+```ts
+// index.ts — ✅ GOOD
+export { default as Root } from './movie-root.svelte';
+export { default as Title } from './movie-title.svelte';
+export { default as Rating } from './movie-rating.svelte';
+// …
+```
+
+```ts
+// ❌ BAD — prefixed flat exports + prop drilling
+export { default as MovieTitle } from './movie-title.svelte';
+export { default as MovieRating } from './movie-rating.svelte';
+```
+
+## Consumer usage
+
+```svelte
+<script lang="ts">
+	import * as Movie from '#lib/components/movie/index.js';
+</script>
+
+<Movie.Root {movie}>
+	<Movie.Title />
+	<Movie.Rating />
+	<Movie.Poster />
+</Movie.Root>
+```
+
+`Root` passes `{movie}` into context; parts like `<Movie.Title />` read from `useMovie()` — no `title={movie.title}` prop drilling.
+
+## Do not
+
+- Export `MovieTitle`, `MovieRating`, etc. as the public API when they belong to one entity
+- Pass entity fields into child parts when those parts sit under `Root`
+- Use ad-hoc `setContext`/`getContext` string keys — use `createContext` + `createX`/`useX`
+- Mix namespace parts with a parallel flat “pass everything as props” API for the same entity

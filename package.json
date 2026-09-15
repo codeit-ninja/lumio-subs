@@ -1,5 +1,5 @@
 {
-	"name": "lumio-subs",
+	"name": "subrest",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
@@ -7,6 +7,7 @@
 		"dev": "docker compose up -d && vite dev",
 		"dev:app": "vite dev",
 		"dev:pb": "docker compose up",
+		"email:dev": "bse dev -d src/lib/emails -p 3020",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
@@ -15,6 +16,7 @@
 		"format": "prettier --write ."
 	},
 	"devDependencies": {
+		"@better-svelte-email/cli": "^2.3.0",
 		"@eslint/js": "^10.0.1",
 		"@iconify-json/lucide": "^1.2.132",
 		"@sveltejs/adapter-bun": "1.0.0-next.2",
@@ -22,6 +24,7 @@
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/node": "^22.20.2",
+		"@types/nodemailer": "^8.0.1",
 		"eslint": "^10.10.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-simple-import-sort": "^14.0.0",
@@ -38,12 +41,18 @@
 		"vite": "^8.3.0"
 	},
 	"dependencies": {
+		"@better-svelte-email/components": "^2.3.0",
+		"@better-svelte-email/server": "^2.3.0",
+		"@fontsource-variable/instrument-sans": "^5.3.0",
+		"@fontsource/jetbrains-mono": "^5.3.0",
 		"@iconify/svelte": "^5.2.2",
 		"bits-ui": "^2.19.2",
 		"cheerio": "^1.2.0",
 		"fflate": "^0.8.3",
 		"neverthrow": "^8.2.0",
+		"nodemailer": "^10.0.10",
 		"pocketbase": "^0.28.1",
+		"stripe": "^22.6.2",
 		"tailwind-variants": "^3.3.1",
 		"zod": "^4.6.5"
 	},

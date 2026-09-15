@@ -17,6 +17,7 @@ export default defineConfig(
 			'.cursor/**',
 			'pocketbase/pb_data/**',
 			'pocketbase/pb_hooks/**',
+			'pocketbase/pb_migrations/**',
 			'src/lib/pocketbase/types.ts',
 			'src/lib/pocketbase/zod.ts'
 		]

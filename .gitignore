@@ -11,3 +11,4 @@ mirror/node_modules
 mirror/data
 .DS_Store
 *.log
+.bse/

@@ -23,8 +23,6 @@ export type ProviderHit = {
 	format: SubtitleFormat;
 	release?: string;
 	fileName?: string;
-	hearingImpaired?: boolean;
-	downloadCount?: number;
 	/** Direct page/download URL when needed to rehydrate later (scrapers). */
 	rawUrl?: string;
 	download: () => ResultAsync<Uint8Array, AppError>;

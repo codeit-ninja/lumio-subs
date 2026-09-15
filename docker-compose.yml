@@ -1,7 +1,7 @@
 services:
   pocketbase:
     image: ghcr.io/muchobien/pocketbase:latest
-    container_name: lumio-subs-pocketbase
+    container_name: subrest-pocketbase
     restart: unless-stopped
     ports:
       - '8093:8090'
@@ -26,7 +26,7 @@ services:
 
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest
-    container_name: lumio-subs-flaresolverr
+    container_name: subrest-flaresolverr
     restart: unless-stopped
     environment:
       - LOG_LEVEL=info
@@ -39,7 +39,7 @@ services:
 
   opensubtitles-scraper:
     image: ghcr.io/lavx/opensubtitles-scraper:latest
-    container_name: lumio-subs-opensubtitles-scraper
+    container_name: subrest-opensubtitles-scraper
     restart: unless-stopped
     ports:
       - '8000:8000'

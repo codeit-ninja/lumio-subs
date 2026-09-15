@@ -10,7 +10,7 @@ const BASE = 'https://www.tvsubtitles.net';
 async function fetchHtml(url: string): Promise<string> {
 	const res = await fetch(url, {
 		headers: {
-			'User-Agent': 'LumioSubs/0.1',
+			'User-Agent': 'SubREST/0.1',
 			Accept: 'text/html'
 		}
 	});
@@ -84,7 +84,7 @@ export class TvSubtitlesProvider implements SubtitleProvider {
 						release: $ep(el).text().trim().slice(0, 200) || undefined,
 						rawUrl: abs,
 						download: () =>
-							fromHttpBytes(abs, { headers: { 'User-Agent': 'LumioSubs/0.1' } }).mapErr((e) =>
+							fromHttpBytes(abs, { headers: { 'User-Agent': 'SubREST/0.1' } }).mapErr((e) =>
 								e.kind === 'http' ? httpError(ERROR_CODE.SCRAPE_FAILED, e.status, e.message) : e
 							)
 					});
@@ -109,7 +109,7 @@ export class TvSubtitlesProvider implements SubtitleProvider {
 		if (!url) {
 			return errAsync(httpError(ERROR_CODE.SCRAPE_FAILED, 400, 'Missing TVSubtitles URL'));
 		}
-		return fromHttpBytes(url, { headers: { 'User-Agent': 'LumioSubs/0.1' } }).mapErr((e) =>
+		return fromHttpBytes(url, { headers: { 'User-Agent': 'SubREST/0.1' } }).mapErr((e) =>
 			e.kind === 'http' ? httpError(ERROR_CODE.SCRAPE_FAILED, e.status, e.message) : e
 		);
 	}

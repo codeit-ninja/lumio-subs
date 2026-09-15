@@ -14,8 +14,8 @@ RUN bun run --bun build
 FROM oven/bun:${BUN_VERSION}-alpine
 WORKDIR /app
 
-LABEL org.opencontainers.image.title="lumio-subs"
-LABEL org.opencontainers.image.description="Lumio Subs — SvelteKit subtitle aggregator on Bun"
+LABEL org.opencontainers.image.title="subrest"
+LABEL org.opencontainers.image.description="SubREST — SvelteKit subtitle aggregator on Bun"
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0

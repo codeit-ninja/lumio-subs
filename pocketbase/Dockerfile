@@ -4,7 +4,7 @@
 
 FROM ghcr.io/muchobien/pocketbase:latest
 
-LABEL org.opencontainers.image.title="lumio-subs-pocketbase"
-LABEL org.opencontainers.image.description="PocketBase for Lumio Subs (migrations)"
+LABEL org.opencontainers.image.title="subrest-pocketbase"
+LABEL org.opencontainers.image.description="PocketBase for SubREST (migrations)"
 
 COPY pb_migrations /pb_migrations

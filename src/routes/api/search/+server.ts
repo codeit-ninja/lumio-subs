@@ -1,6 +1,6 @@
-import { error, json } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
 
-import { formatAppError } from '#lib/server/result.js';
+import { apiError, apiValidationError } from '#lib/server/api-response.js';
 import { searchQuerySchema } from '#lib/subtitles/dto.js';
 
 import type { RequestHandler } from './$types';
@@ -18,13 +18,12 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	});
 
 	if (!parsed.success) {
-		error(400, parsed.error.issues[0]?.message ?? 'Invalid query');
+		return apiValidationError(parsed.error.issues[0]?.message ?? 'Invalid query');
 	}
 
 	const result = await locals.services.subtitles().search(parsed.data);
 	if (result.isErr()) {
-		const status = result.error.kind === 'config' ? 500 : (result.error.status ?? 500);
-		error(status, formatAppError(result.error));
+		return apiError(result.error);
 	}
 
 	return json({ results: result.value });

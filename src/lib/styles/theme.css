@@ -1,7 +1,7 @@
 /*
- * Lumio solid product theme
+ * SubREST solid product theme
  * Canonical visual language: dark, sharp surfaces — Vercel/Cloudflare-like.
- * Color palette preserved from the prior Lumio design refs.
+ * Color palette preserved from prior design refs.
  */
 
 @theme {
@@ -56,63 +56,25 @@
 
 @layer base {
 	:root {
-		--lumio-bg: var(--color-background);
-		--lumio-fg: var(--color-foreground);
-		--lumio-muted: var(--color-muted);
-		--lumio-primary: var(--color-primary-500);
-		--lumio-rating: var(--color-rating);
-		--lumio-favorite: var(--color-favorite);
-		--lumio-border: var(--color-border);
-		--lumio-surface: var(--color-surface);
+		--subrest-bg: var(--color-background);
+		--subrest-fg: var(--color-foreground);
+		--subrest-muted: var(--color-muted);
+		--subrest-primary: var(--color-primary-500);
+		--subrest-rating: var(--color-rating);
+		--subrest-favorite: var(--color-favorite);
+		--subrest-border: var(--color-border);
+		--subrest-surface: var(--color-surface);
 	}
 
 	html {
-		/* Scale rem-based type, spacing, and controls on large screens */
 		font-size: clamp(16px, 0.75rem + 0.35vw, 18px);
+		scrollbar-gutter: stable;
+		overflow-anchor: none;
 	}
 
 	html,
 	body {
 		background-color: var(--color-background);
 		color: var(--color-foreground);
-	}
-}
-
-@layer components {
-	.field-input {
-		width: 100%;
-		background: var(--color-surface);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-input);
-		color: var(--color-foreground);
-		font-size: 0.875rem;
-		line-height: 1.5;
-		padding: 0.5rem 0.75rem;
-		outline: none;
-		transition:
-			border-color 150ms ease,
-			background 150ms ease;
-	}
-
-	.field-input::placeholder {
-		color: var(--color-muted);
-	}
-
-	.field-input:hover:not(:disabled) {
-		border-color: var(--color-border-strong);
-	}
-
-	.field-input:focus-visible {
-		border-color: var(--color-primary-400);
-		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-500) 28%, transparent);
-	}
-
-	.field-input[aria-invalid='true'] {
-		border-color: color-mix(in srgb, var(--color-favorite) 55%, transparent);
-	}
-
-	.field-input:disabled {
-		opacity: 0.55;
-		cursor: not-allowed;
 	}
 }

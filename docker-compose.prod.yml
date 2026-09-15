@@ -1,8 +1,8 @@
 # Production stack — app + PocketBase + LavX OpenSubtitles scraper.
 #
 # Required env:
-#   APP_IMAGE=ghcr.io/<owner>/lumio-subs:latest
-#   POCKETBASE_IMAGE=ghcr.io/<owner>/lumio-subs-pocketbase:latest
+#   APP_IMAGE=ghcr.io/<owner>/subrest:latest
+#   POCKETBASE_IMAGE=ghcr.io/<owner>/subrest-pocketbase:latest
 #   TMDB_API_KEY / PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD
 #   ORIGIN=https://subs.example.com   (public URL of the app)
 #
@@ -15,7 +15,7 @@
 
 services:
   app:
-    image: ${APP_IMAGE:-ghcr.io/OWNER/lumio-subs:latest}
+    image: ${APP_IMAGE:-ghcr.io/OWNER/subrest:latest}
     restart: unless-stopped
     ports:
       - '${APP_PORT:-3000}:3000'
@@ -51,7 +51,7 @@ services:
       start_period: 20s
 
   pocketbase:
-    image: ${POCKETBASE_IMAGE:-ghcr.io/OWNER/lumio-subs-pocketbase:latest}
+    image: ${POCKETBASE_IMAGE:-ghcr.io/OWNER/subrest-pocketbase:latest}
     restart: unless-stopped
     ports:
       - '${PB_PORT:-8093}:8090'

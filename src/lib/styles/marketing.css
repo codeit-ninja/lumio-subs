@@ -1,0 +1,165 @@
+@import '@fontsource-variable/instrument-sans/wght.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+@theme {
+	--font-marketing: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+	--font-marketing-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.marketing-home {
+	font-family: var(--font-marketing);
+}
+
+.marketing-home .font-mono,
+.marketing-home code,
+.marketing-home pre {
+	font-family: var(--font-marketing-mono);
+}
+
+/* Cloudflare-style technical frame + hollow square markers */
+.cf-frame {
+	position: relative;
+	border: 1px solid var(--color-border);
+}
+
+.cf-frame-dashed {
+	border-style: dashed;
+	border-color: color-mix(in oklab, var(--color-border-strong) 70%, transparent);
+}
+
+.cf-mark {
+	position: absolute;
+	z-index: 2;
+	width: 5px;
+	height: 5px;
+	border: 1px solid var(--color-border-strong);
+	background: var(--color-background);
+	pointer-events: none;
+}
+
+.cf-mark-tl {
+	top: -3px;
+	left: -3px;
+}
+
+.cf-mark-tr {
+	top: -3px;
+	right: -3px;
+}
+
+.cf-mark-bl {
+	bottom: -3px;
+	left: -3px;
+}
+
+.cf-mark-br {
+	bottom: -3px;
+	right: -3px;
+}
+
+.cf-mark-mt {
+	top: -3px;
+	left: 50%;
+	transform: translateX(-50%);
+}
+
+.cf-mark-mb {
+	bottom: -3px;
+	left: 50%;
+	transform: translateX(-50%);
+}
+
+.cf-mark-ml {
+	top: 50%;
+	left: -3px;
+	transform: translateY(-50%);
+}
+
+.cf-mark-mr {
+	top: 50%;
+	right: -3px;
+	transform: translateY(-50%);
+}
+
+/* Column intersection marks (4-col pricing) */
+.cf-mark-t1 {
+	top: -3px;
+	left: 25%;
+	transform: translateX(-50%);
+}
+
+.cf-mark-t2 {
+	top: -3px;
+	left: 50%;
+	transform: translateX(-50%);
+}
+
+.cf-mark-t3 {
+	top: -3px;
+	left: 75%;
+	transform: translateX(-50%);
+}
+
+.cf-mark-b1 {
+	bottom: -3px;
+	left: 25%;
+	transform: translateX(-50%);
+}
+
+.cf-mark-b2 {
+	bottom: -3px;
+	left: 50%;
+	transform: translateX(-50%);
+}
+
+.cf-mark-b3 {
+	bottom: -3px;
+	left: 75%;
+	transform: translateX(-50%);
+}
+
+/* 3-col benefits */
+.cf-mark-t33 {
+	top: -3px;
+	left: 33.333%;
+	transform: translateX(-50%);
+}
+
+.cf-mark-t66 {
+	top: -3px;
+	left: 66.666%;
+	transform: translateX(-50%);
+}
+
+.cf-mark-b33 {
+	bottom: -3px;
+	left: 33.333%;
+	transform: translateX(-50%);
+}
+
+.cf-mark-b66 {
+	bottom: -3px;
+	left: 66.666%;
+	transform: translateX(-50%);
+}
+
+/* Docs sidebar/content split (w-52 / lg:w-56) */
+.cf-mark-docs-split-t {
+	top: -3px;
+	left: 13rem;
+	transform: translateX(-50%);
+}
+
+.cf-mark-docs-split-b {
+	bottom: -3px;
+	left: 13rem;
+	transform: translateX(-50%);
+}
+
+@media (min-width: 64rem) {
+	.cf-mark-docs-split-t,
+	.cf-mark-docs-split-b {
+		left: 14rem;
+	}
+}
