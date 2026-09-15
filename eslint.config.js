@@ -34,6 +34,8 @@ export default defineConfig(
 		},
 		rules: {
 			'no-undef': 'off',
+			curly: ['error', 'all'],
+			'padding-line-between-statements': ['error', { blankLine: 'always', prev: 'if', next: '*' }],
 			'@typescript-eslint/consistent-type-imports': [
 				'error',
 				{

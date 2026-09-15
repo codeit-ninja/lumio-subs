@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { unzipSync } from 'fflate';
+import { VTT } from 'js-vtt';
 
 const ZIP_MAGIC = [0x50, 0x4b] as const;
 const SUBTITLE_EXT = /\.(srt|vtt|ass|ssa|sub)$/i;
@@ -26,41 +27,19 @@ export function ensureSubtitleBytes(bytes: Uint8Array): Uint8Array {
 	return extracted;
 }
 
+function parseSubtitle(raw: string): VTT {
+	const trimmed = raw.replace(/^\uFEFF/, '').trim();
+	return trimmed.startsWith('WEBVTT') ? VTT.fromString(trimmed) : VTT.fromSRT(trimmed);
+}
+
 /** Convert SRT (or already-VTT) text to WebVTT. */
 export function toVtt(raw: string): string {
-	const trimmed = raw.replace(/^\uFEFF/, '').trim();
-	if (trimmed.startsWith('WEBVTT')) {
-		return trimmed.endsWith('\n') ? trimmed : `${trimmed}\n`;
-	}
+	return parseSubtitle(raw).toString('vtt');
+}
 
-	const body = trimmed
-		.replace(/\r\n/g, '\n')
-		.replace(/\r/g, '\n')
-		.split(/\n\n+/)
-		.map((block) => {
-			const lines = block.split('\n').filter(Boolean);
-			if (lines.length < 2) {
-				return null;
-			}
-
-			let i = 0;
-			if (/^\d+$/.test(lines[0]!)) {
-				i = 1;
-			}
-
-			const timing = lines[i];
-			if (!timing?.includes('-->')) {
-				return null;
-			}
-
-			const vttTiming = timing.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
-			const text = lines.slice(i + 1).join('\n');
-			return `${vttTiming}\n${text}`;
-		})
-		.filter(Boolean)
-		.join('\n\n');
-
-	return `WEBVTT\n\n${body}\n`;
+/** Convert VTT (or already-SRT) text to SubRip. */
+export function toSrt(raw: string): string {
+	return parseSubtitle(raw).toString('srt');
 }
 
 export function decodeSubtitleBytes(bytes: Uint8Array): string {

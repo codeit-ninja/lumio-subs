@@ -22,7 +22,7 @@
 </script>
 
 <div
-	class="sticky top-[3.25rem] z-20 border border-border bg-surface px-3 py-2.5 sm:px-4"
+	class="sticky top-[3.25rem] z-20 border border-border bg-background px-3 py-2.5 sm:px-4"
 	role="region"
 	aria-label="API key"
 >

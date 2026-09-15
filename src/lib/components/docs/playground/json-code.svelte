@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CodeWindow, JsonHighlight } from '#lib/components/marketing/index.js';
+	import { CfFrame, CodeWindow, JsonHighlight } from '#lib/components/marketing/index.js';
 
 	let {
 		source,
@@ -14,8 +14,10 @@
 	} = $props();
 </script>
 
-<CodeWindow variant="embedded" class={className}>
-	{#snippet title()}{titleText}{/snippet}
-	{#snippet titleTrailing()}{titleTrailingText}{/snippet}
-	<JsonHighlight {source} class="border-0" />
-</CodeWindow>
+<CfFrame class={className}>
+	<CodeWindow variant="embedded" showTrafficLights={false}>
+		{#snippet title()}{titleText}{/snippet}
+		{#snippet titleTrailing()}{titleTrailingText}{/snippet}
+		<JsonHighlight {source} class="border-0" />
+	</CodeWindow>
+</CfFrame>

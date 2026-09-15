@@ -59,7 +59,7 @@ Response:
 			"language": "en",
 			"format": "vtt",
 			"release": "…",
-			"downloadUrl": "https://…r2.cloudflarestorage.com/bucket/…/….vtt"
+			"downloadUrl": "https://download.subrest.org/…/….vtt"
 		}
 	]
 }
@@ -97,12 +97,13 @@ Permanent store: first search (and later TTL refreshes) scrape providers, downlo
 | `OPENSUBTITLES_SCRAPER_URL`   | LavX scraper base URL (default `http://127.0.0.1:8000`)  |
 | `SUBDL_API_KEY`               | Optional SubDL API key (skipped when empty)              |
 | `PB_ADMIN_EMAIL` / `PASSWORD` | Server-side PocketBase auth for subtitle writes          |
-| `CLOUDFLARE_R2_ENDPOINT`      | R2 S3 API base used to build public `downloadUrl`s       |
-| `CLOUDFLARE_R2_BUCKET`        | Bucket name (must allow anonymous GET on PB object keys) |
+| `CLOUDFLARE_R2_ENDPOINT`         | R2 S3 API base (PocketBase file storage)                    |
+| `CLOUDFLARE_R2_BUCKET`           | Bucket name for PocketBase storage                          |
+| `CLOUDFLARE_R2_PUBLIC_BASE_URL`  | Custom domain / CDN base for public `downloadUrl`s          |
 
 Configure PocketBase Admin → **Settings → Files storage** to use the same R2 bucket. Public object URLs are:
 
-`{CLOUDFLARE_R2_ENDPOINT}/{CLOUDFLARE_R2_BUCKET}/{collectionId}/{recordId}/{fileName}`
+`{CLOUDFLARE_R2_PUBLIC_BASE_URL}/{collectionId}/{recordId}/{fileName}`
 
 ## Auth (email login)
 

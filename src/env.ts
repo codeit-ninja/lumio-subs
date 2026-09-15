@@ -7,9 +7,11 @@ export const variables = defineEnvVars({
 	SUBDL_API_KEY: { schema: (input) => input ?? '' },
 	PB_ADMIN_EMAIL: { schema: (input) => input ?? '' },
 	PB_ADMIN_PASSWORD: { schema: (input) => input ?? '' },
-	/** Public R2 base used to build direct file URLs (PB stores objects in this bucket). */
+	/** R2 S3 API endpoint (PocketBase file storage). */
 	CLOUDFLARE_R2_ENDPOINT: { schema: (input) => input ?? '' },
 	CLOUDFLARE_R2_BUCKET: { schema: (input) => input ?? '' },
+	/** Public CDN / custom domain for direct `downloadUrl`s (no bucket in path). */
+	CLOUDFLARE_R2_PUBLIC_BASE_URL: { schema: (input) => input ?? '' },
 	SMTP_HOST: { schema: (input) => input ?? '' },
 	SMTP_PORT: { schema: (input) => input ?? '465' },
 	SMTP_USER: { schema: (input) => input ?? '' },

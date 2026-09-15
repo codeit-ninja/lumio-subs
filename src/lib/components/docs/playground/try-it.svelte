@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 
-	import { CodeWindow } from '#lib/components/marketing/index.js';
+	import { CfFrame, CodeWindow } from '#lib/components/marketing/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Icon } from '#lib/components/ui/icon/index.js';
 	import { Input, inputVariants } from '#lib/components/ui/input/index.js';
@@ -74,7 +74,10 @@
 	const selectClass = inputVariants({ class: 'h-8 py-1 text-sm' });
 
 	function truncate(text: string): string {
-		if (text.length <= BODY_PREVIEW_LIMIT) return text;
+		if (text.length <= BODY_PREVIEW_LIMIT) {
+			return text;
+		}
+
 		return `${text.slice(0, BODY_PREVIEW_LIMIT)}\n… (truncated)`;
 	}
 
@@ -140,12 +143,10 @@
 	}
 </script>
 
-<div
-	class="space-y-4 rounded-md border border-border bg-surface p-4 lg:sticky lg:top-[9rem] {className}"
->
+<div class="space-y-4 border border-border bg-background p-4 lg:sticky lg:top-[9rem] {className}">
 	<div class="space-y-1">
 		<div class="flex flex-wrap items-baseline gap-2 font-mono text-sm">
-			<span class="font-medium text-emerald-400">{method}</span>
+			<span class="json-method">{method}</span>
 			<span class="break-all text-foreground">{pathTemplate}</span>
 		</div>
 		{#if description}
@@ -187,15 +188,17 @@
 		</div>
 	{/if}
 
-	<CodeWindow variant="embedded" class="overflow-hidden rounded-md border border-border">
-		{#snippet title()}Request{/snippet}
-		{#snippet titleTrailing()}preview{/snippet}
-		<pre
-			class="overflow-x-auto p-3 font-mono text-[0.7rem] leading-relaxed text-muted sm:text-xs"><code
-				><span class="text-emerald-400">{method}</span> {requestUrl}
+	<CfFrame>
+		<CodeWindow variant="embedded" showTrafficLights={false}>
+			{#snippet title()}Request{/snippet}
+			{#snippet titleTrailing()}preview{/snippet}
+			<pre
+				class="overflow-x-auto p-3 font-mono text-[0.7rem] leading-relaxed text-muted sm:text-xs"><code
+					><span class="json-method">{method}</span> {requestUrl}
 {authLine}</code
-			></pre>
-	</CodeWindow>
+				></pre>
+		</CodeWindow>
+	</CfFrame>
 
 	<Button type="button" variant="primary" size="sm" {loading} onclick={send}>
 		<Icon icon="lucide:play" class="size-3.5 shrink-0" />
@@ -208,12 +211,12 @@
 				{#if status != null}
 					<span
 						class={[
-							'inline-flex items-center border px-2 py-0.5 font-mono',
+							'inline-flex items-center border border-border px-2 py-0.5 font-mono',
 							statusOk
-								? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+								? 'bg-surface text-foreground'
 								: statusRedirect
-									? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
-									: 'border-red-500/40 bg-red-500/10 text-red-400'
+									? 'text-amber-400'
+									: 'border-favorite text-favorite'
 						]}
 					>
 						{status}
@@ -228,28 +231,40 @@
 			</div>
 
 			{#if responseKind === 'redirect'}
-				<CodeWindow variant="embedded" class="overflow-hidden rounded-md border border-border">
-					{#snippet title()}Redirect{/snippet}
-					{#snippet titleTrailing()}Location{/snippet}
-					<pre
-						class="overflow-x-auto p-3 font-mono text-[0.7rem] leading-relaxed text-muted sm:text-xs"><code
-							>{locationHeader || '(no Location header — opaqueredirect)'}</code
-						></pre>
-				</CodeWindow>
+				<CfFrame>
+					<CodeWindow variant="embedded" showTrafficLights={false}>
+						{#snippet title()}Redirect{/snippet}
+						{#snippet titleTrailing()}Location{/snippet}
+						<pre
+							class="overflow-x-auto p-3 font-mono text-[0.7rem] leading-relaxed text-muted sm:text-xs"><code
+								>{locationHeader || '(no Location header — opaqueredirect)'}</code
+							></pre>
+					</CodeWindow>
+				</CfFrame>
 			{:else if responseKind === 'json'}
 				<JsonCode source={responseBody} title="Response" />
 			{:else if responseKind === 'text' || responseKind === 'error'}
-				<CodeWindow variant="embedded" class="overflow-hidden rounded-md border border-border">
-					{#snippet title()}Response{/snippet}
-					{#snippet titleTrailing()}{responseKind === 'error' ? 'error' : 'text'}{/snippet}
-					<pre
-						class="max-h-[min(28rem,55vh)] overflow-auto p-3 font-mono text-[0.7rem] leading-relaxed text-muted sm:text-xs"><code
-							>{responseBody}</code
-						></pre>
-				</CodeWindow>
+				<CfFrame>
+					<CodeWindow variant="embedded" showTrafficLights={false}>
+						{#snippet title()}Response{/snippet}
+						{#snippet titleTrailing()}{responseKind === 'error' ? 'error' : 'text'}{/snippet}
+						<pre
+							class="max-h-[min(28rem,55vh)] overflow-auto p-3 font-mono text-[0.7rem] leading-relaxed text-muted sm:text-xs"><code
+								>{responseBody}</code
+							></pre>
+					</CodeWindow>
+				</CfFrame>
 			{:else if responseKind === 'empty'}
 				<p class="text-sm text-muted">Empty response body.</p>
 			{/if}
 		</div>
 	{/if}
 </div>
+
+<style>
+	/* Matches CodeWindow .json-method for the sticky panel header outside the window. */
+	.json-method {
+		color: #34d399;
+		font-weight: 500;
+	}
+</style>

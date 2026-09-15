@@ -13,7 +13,7 @@ import { OpenSubtitlesProvider } from './providers/opensubtitles';
 import type { ProviderHit } from './providers/types';
 import type { AppError } from './result';
 import { ERROR_CODE, formatAppError, httpError, promiseWithTimeout } from './result';
-import { ensureSubtitleBytes, toVtt } from './subtitle-format';
+import { ensureSubtitleBytes, toSrt, toVtt } from './subtitle-format';
 import type { ResolvedMedia } from './tmdb.service';
 import { TmdbService } from './tmdb.service';
 
@@ -173,12 +173,9 @@ export class SubtitleService extends Service {
 									contentType: 'text/vtt; charset=utf-8'
 								};
 							}
-							const srt = text.startsWith('WEBVTT')
-								? text.replace(/^WEBVTT\n\n?/, '').replace(/(\d{2}:\d{2}:\d{2})\.(\d{3})/g, '$1,$2')
-								: text;
 							return {
 								kind: 'body' as const,
-								body: srt,
+								body: toSrt(text),
 								contentType: 'application/x-subrip; charset=utf-8'
 							};
 						}),

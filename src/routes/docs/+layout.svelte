@@ -22,7 +22,10 @@
 </script>
 
 <div class="marketing-home px-4">
-	<CfFrame marks="docs" class="mx-auto flex min-h-[calc(100dvh-3.25rem)] w-full max-w-6xl">
+	<CfFrame
+		marks="docs"
+		class="mx-auto flex min-h-[calc(100dvh-3.25rem)] w-full {isApi ? 'max-w-7xl' : 'max-w-6xl'}"
+	>
 		<aside class="hidden w-52 shrink-0 border-r border-border md:block lg:w-56">
 			<div class="sticky top-[3.25rem] py-8 pr-6 pl-4">
 				<DocsSidebar />
@@ -50,7 +53,7 @@
 					{/if}
 				</div>
 
-				<article class="docs-prose w-full {isApi ? 'max-w-6xl' : 'max-w-3xl'}">
+				<article class="docs-prose w-full {isApi ? 'max-w-none' : 'max-w-3xl'}">
 					{@render children()}
 				</article>
 			</div>
@@ -151,6 +154,28 @@
 		border: none;
 		padding: 0;
 		font-size: inherit;
+	}
+
+	/* Playground / marketing code chrome — don't apply prose code chrome */
+	:global(.docs-prose .code-window) {
+		margin-bottom: 1.25rem;
+	}
+
+	:global(.docs-prose .code-window pre),
+	:global(.docs-prose .code-window code),
+	:global(.docs-prose .json-panel),
+	:global(.docs-prose .json-panel code) {
+		background: transparent;
+		border: none;
+		padding: 0;
+		margin: 0;
+		color: inherit;
+		font-size: inherit;
+		line-height: inherit;
+	}
+
+	:global(.docs-prose .json-panel) {
+		padding: 1rem;
 	}
 
 	:global(.docs-prose table) {

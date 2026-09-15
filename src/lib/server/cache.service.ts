@@ -2,7 +2,7 @@ import { errAsync, okAsync, ResultAsync as RA } from 'neverthrow';
 import type { ListResult, RecordModel } from 'pocketbase';
 import { z } from 'zod';
 
-import { CLOUDFLARE_R2_BUCKET, CLOUDFLARE_R2_ENDPOINT } from '$app/env/private';
+import { CLOUDFLARE_R2_PUBLIC_BASE_URL } from '$app/env/private';
 
 import { Service } from './base.service';
 import type { ProviderHit } from './providers/types';
@@ -12,7 +12,10 @@ import { contentHash, decodeSubtitleBytes, guessFormat, toVtt } from './subtitle
 import type { ResolvedMedia } from './tmdb.service';
 
 function clip(value: string, max: number): string {
-	if (value.length <= max) return value;
+	if (value.length <= max) {
+		return value;
+	}
+
 	return value.slice(0, max);
 }
 
@@ -52,7 +55,10 @@ export type SubtitleSearchRecord = {
 
 function parseSearch(raw: unknown): SubtitleSearchRecord | null {
 	const result = searchRecordSchema.safeParse(raw);
-	if (!result.success) return null;
+	if (!result.success) {
+		return null;
+	}
+
 	return {
 		id: result.data.id,
 		mediaId: result.data.media ?? null,
@@ -82,7 +88,10 @@ export class CacheService extends Service {
 				const file = row.file;
 				return !(typeof file === 'string' ? file.length > 0 : Boolean(file));
 			});
-			if (empty.length === 0) return okAsync(undefined);
+			if (empty.length === 0) {
+				return okAsync(undefined);
+			}
+
 			return RA.combine(
 				empty.map((row) => fromPb(this.pocketbase.collection('subtitles').delete(row.id)))
 			).map(() => undefined);
@@ -105,17 +114,33 @@ export class CacheService extends Service {
 		mediaId: string | null
 	): RA<SubtitleSearchRecord, AppError> {
 		return this.findSearchByKey(key).andThen((existing) => {
-			if (existing) return okAsync(existing);
+			if (existing) {
+				return okAsync(existing);
+			}
 
 			const payload: Record<string, unknown> = {
 				language: clip(key.language, 8),
 				lastFetchedAt: new Date(0).toISOString()
 			};
-			if (mediaId) payload.media = mediaId;
-			if (key.imdbId) payload.imdbId = clip(key.imdbId, 32);
-			if (key.tmdbId) payload.tmdbId = key.tmdbId;
-			if (key.season != null) payload.season = key.season;
-			if (key.episode != null) payload.episode = key.episode;
+			if (mediaId) {
+				payload.media = mediaId;
+			}
+
+			if (key.imdbId) {
+				payload.imdbId = clip(key.imdbId, 32);
+			}
+
+			if (key.tmdbId) {
+				payload.tmdbId = key.tmdbId;
+			}
+
+			if (key.season != null) {
+				payload.season = key.season;
+			}
+
+			if (key.episode != null) {
+				payload.episode = key.episode;
+			}
 
 			return fromPb<RecordModel>(
 				this.pocketbase.collection('subtitle_searches').create(payload, {
@@ -129,6 +154,7 @@ export class CacheService extends Service {
 							httpError(ERROR_CODE.INTERNAL, 500, 'Invalid subtitle_searches record')
 						);
 					}
+
 					return okAsync(parsed);
 				})
 				.orElse(() =>
@@ -138,6 +164,7 @@ export class CacheService extends Service {
 								httpError(ERROR_CODE.INTERNAL, 500, 'Failed to create subtitle_searches record')
 							);
 						}
+
 						return okAsync(row);
 					})
 				);
@@ -154,6 +181,7 @@ export class CacheService extends Service {
 			if (!parsed) {
 				return errAsync(httpError(ERROR_CODE.INTERNAL, 500, 'Invalid subtitle_searches record'));
 			}
+
 			return okAsync(parsed);
 		});
 	}
@@ -171,18 +199,38 @@ export class CacheService extends Service {
 		const withBytes = hits.filter((hit) => hit.bytes != null && hit.bytes.length > 0);
 		const creates = withBytes.map((hit) => {
 			const form = new FormData();
-			if (key.imdbId) form.set('imdbId', clip(key.imdbId, 32));
-			if (key.tmdbId) form.set('tmdbId', String(key.tmdbId));
+			if (key.imdbId) {
+				form.set('imdbId', clip(key.imdbId, 32));
+			}
+
+			if (key.tmdbId) {
+				form.set('tmdbId', String(key.tmdbId));
+			}
+
 			form.set('mediaType', media.mediaType);
-			if (media.title) form.set('title', clip(media.title, 500));
-			if (key.season != null) form.set('season', String(key.season));
-			if (key.episode != null) form.set('episode', String(key.episode));
+			if (media.title) {
+				form.set('title', clip(media.title, 500));
+			}
+
+			if (key.season != null) {
+				form.set('season', String(key.season));
+			}
+
+			if (key.episode != null) {
+				form.set('episode', String(key.episode));
+			}
+
 			form.set('language', clip(hit.language, 8));
 			form.set('provider', clip(hit.provider, 64));
 			form.set('externalId', clip(hit.externalId, 256));
 			form.set('fetchedAt', now);
-			if (hit.release) form.set('release', clip(hit.release, 500));
-			if (hit.rawUrl) form.set('rawUrl', clip(hit.rawUrl, 2000));
+			if (hit.release) {
+				form.set('release', clip(hit.release, 500));
+			}
+
+			if (hit.rawUrl) {
+				form.set('rawUrl', clip(hit.rawUrl, 2000));
+			}
 
 			try {
 				const text = decodeSubtitleBytes(hit.bytes!);
@@ -219,6 +267,7 @@ export class CacheService extends Service {
 					message: `Subtitle ${id} not found`
 				};
 			}
+
 			return e;
 		});
 	}
@@ -241,34 +290,49 @@ export class CacheService extends Service {
 
 	fileUrl(record: RecordModel): string | null {
 		const fileName = record.file as string | undefined;
-		if (!fileName) return null;
+		if (!fileName) {
+			return null;
+		}
+
 		return this.pocketbase.files.getURL(record, fileName);
 	}
 
 	/**
 	 * Direct public R2 object URL for a PocketBase file field.
 	 * Key layout: `{collectionId}/{recordId}/{fileName}` (PB S3 storage).
+	 * Uses the custom-domain base (bucket is bound to the domain, not in the path).
 	 */
 	r2FileUrl(record: RecordModel): string | null {
 		const fileName = record.file as string | undefined;
-		if (!fileName) return null;
+		if (!fileName) {
+			return null;
+		}
 
-		const endpoint = CLOUDFLARE_R2_ENDPOINT.trim().replace(/\/+$/, '');
-		const bucket = CLOUDFLARE_R2_BUCKET.trim().replace(/^\/+|\/+$/g, '');
-		if (!endpoint || !bucket) return null;
+		const publicBase = CLOUDFLARE_R2_PUBLIC_BASE_URL.trim().replace(/\/+$/, '');
+		if (!publicBase) {
+			return null;
+		}
 
 		const collectionId = record.collectionId;
-		if (!collectionId) return null;
+		if (!collectionId) {
+			return null;
+		}
 
 		const key = `${collectionId}/${record.id}/${encodeURIComponent(fileName)}`;
-		return `${endpoint}/${bucket}/${key}`;
+		return `${publicBase}/${key}`;
 	}
 
 	async readFileText(record: RecordModel): Promise<string | null> {
 		const url = this.fileUrl(record);
-		if (!url) return null;
+		if (!url) {
+			return null;
+		}
+
 		const res = await fetch(url);
-		if (!res.ok) return null;
+		if (!res.ok) {
+			return null;
+		}
+
 		return res.text();
 	}
 

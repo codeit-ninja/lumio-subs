@@ -19,14 +19,19 @@ export const docsNav: DocsNavSection[] = [
 	},
 	{
 		title: 'API',
-		items: [{ href: '/docs/api', label: 'Overview' }]
+		items: [
+			{ href: '/docs/api', label: 'Overview' },
+			{ href: '/docs/api/search', label: 'Search' },
+			{ href: '/docs/api/subtitles', label: 'Subtitles' }
+		]
 	}
 ];
 
 export function isDocsNavActive(pathname: string, href: string): boolean {
-	if (href === '/docs') {
-		return pathname === '/docs' || pathname === '/docs/';
+	if (href === '/docs' || href === '/docs/api') {
+		return pathname === href || pathname === `${href}/`;
 	}
+
 	return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -43,6 +48,7 @@ export function getDocsAdjacent(pathname: string): {
 	if (index < 0) {
 		return { prev: null, next: null };
 	}
+
 	return {
 		prev: index > 0 ? items[index - 1]! : null,
 		next: index < items.length - 1 ? items[index + 1]! : null
