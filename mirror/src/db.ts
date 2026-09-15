@@ -41,6 +41,30 @@ export type SubtitleRow = {
 	attempts: number;
 };
 
+export async function waitForDatabase(opts?: {
+	attempts?: number;
+	delayMs?: number;
+}): Promise<void> {
+	const attempts = opts?.attempts ?? 60;
+	const delayMs = opts?.delayMs ?? 2_000;
+	const pool = getPool();
+
+	for (let i = 1; i <= attempts; i++) {
+		try {
+			await pool.query('SELECT 1');
+			return;
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			if (i === attempts) {
+				throw new Error(`Postgres not ready after ${attempts} attempts: ${message}`, {
+					cause: err
+				});
+			}
+			await Bun.sleep(delayMs);
+		}
+	}
+}
+
 export async function initSchema(sqlPath: string): Promise<void> {
 	const sql = await Bun.file(sqlPath).text();
 	await getPool().query(sql);

@@ -4,7 +4,7 @@ import type { S3Client } from '@aws-sdk/client-s3';
 
 import { loadConfig } from '../config.ts';
 import type { SubtitleRow } from '../db.ts';
-import { closePool, getPool } from '../db.ts';
+import { closePool, getPool, waitForDatabase } from '../db.ts';
 import { createLogger } from '../logger.ts';
 import { LavxClient } from '../scraper/lavx.ts';
 import { createR2Client, objectExists, putGzipObject, storageKeyFor } from '../storage/r2.ts';
@@ -151,6 +151,7 @@ async function processOne(
 }
 
 async function workerLoop(): Promise<void> {
+	await waitForDatabase();
 	const cfg = loadConfig();
 	const lavx = new LavxClient(cfg.OPENSUBTITLES_SCRAPER_URL);
 	const r2 = createR2Client(cfg);

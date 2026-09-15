@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createGunzip } from 'node:zlib';
 
-import { closePool, getPool } from '../db.ts';
+import { closePool, getPool, waitForDatabase } from '../db.ts';
 import { resolveDumpPath } from '../download-dump.ts';
 import { createLogger } from '../logger.ts';
 
@@ -145,6 +145,7 @@ async function flushBatch(rows: ParsedRow[]): Promise<void> {
 }
 
 async function main() {
+	await waitForDatabase();
 	const inputArg = process.argv[2];
 	const inputPath = resolve(await resolveDumpPath(inputArg));
 	log.info({ inputPath }, 'starting metadata import');
