@@ -100,7 +100,7 @@ Search stores **metadata only**; the subtitle body is downloaded lazily on first
 Workflow [`.github/workflows/app-image.yml`](.github/workflows/app-image.yml) builds and pushes:
 
 - `ghcr.io/<owner>/lumio-subs` — SvelteKit app (Bun)
-- `ghcr.io/<owner>/lumio-subs-pocketbase` — PocketBase + migrations/hooks
+- `ghcr.io/<owner>/lumio-subs-pocketbase` — PocketBase + migrations (no schema-generator hooks)
 
 Triggers: push to the default branch touching app/PocketBase paths, or manual **workflow_dispatch**.
 
