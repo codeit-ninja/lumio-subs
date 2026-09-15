@@ -4,6 +4,7 @@ import { createInterface } from 'node:readline';
 import { createGunzip } from 'node:zlib';
 
 import { closePool, getPool } from '../db.ts';
+import { resolveDumpPath } from '../download-dump.ts';
 import { createLogger } from '../logger.ts';
 
 const log = createLogger('import-metadata');
@@ -145,12 +146,7 @@ async function flushBatch(rows: ParsedRow[]): Promise<void> {
 
 async function main() {
 	const inputArg = process.argv[2];
-	if (!inputArg) {
-		console.error('Usage: bun run import-metadata -- <path-to-subtitles_all.txt.gz>');
-		process.exit(1);
-	}
-
-	const inputPath = resolve(inputArg);
+	const inputPath = resolve(await resolveDumpPath(inputArg));
 	log.info({ inputPath }, 'starting metadata import');
 
 	const stream = createReadStream(inputPath).pipe(createGunzip());

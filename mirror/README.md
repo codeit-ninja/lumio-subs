@@ -76,17 +76,26 @@ R2_SECRET_ACCESS_KEY=...
 R2_BUCKET=opensubtitles-mirror
 OPENSUBTITLES_SCRAPER_URL=http://opensubtitles-scraper:8000
 WORKER_RATE_PER_SECOND=10
+METADATA_DUMP_URL=https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
 ```
 
 2. Paste/deploy `docker-compose.deploy.yml` (or Git path `mirror/docker-compose.deploy.yml`).
-3. Worker entrypoint runs migrations, then the download loop.
-4. One-shot metadata import (after uploading `subtitles_all.txt.gz` into the container or a volume):
+3. **importer** downloads the dump (cached on `mirror_data`) and upserts into Postgres — can take hours the first time. **worker** starts only after importer exits successfully.
+4. Re-deploy reuses the cached `.gz` unless you set `METADATA_DUMP_FORCE_DOWNLOAD=true`.
+
+Local / one-shot:
 
 ```bash
-docker compose -f docker-compose.deploy.yml run --rm \
-  -v /path/to/subtitles_all.txt.gz:/data/subtitles_all.txt.gz:ro \
-  worker import-metadata /data/subtitles_all.txt.gz
+# URL via env
+METADATA_DUMP_URL=https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz \
+  bun run import-metadata
+
+# or pass URL / path as argument
+bun run import-metadata -- https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
+bun run import-metadata -- ./data/subtitles_all.txt.gz
 ```
+
+Note: `dl.opensubtitles.org` sits behind Cloudflare; downloads from a VPS/datacenter IP can fail or challenge. If that happens, download elsewhere and mount the file, or set `METADATA_DUMP_PATH` to an already-present file.
 
 Expect **~12 days** ideal at 10 req/s; **2–4+ weeks** realistic. Budget **~200–300 GB** R2.
 
