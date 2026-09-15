@@ -4,12 +4,11 @@ Private archive pipeline: **Postgres** (metadata) + **Cloudflare R2** (gzipped s
 
 ## Prerequisites
 
-- Bun
-- Docker
+- Bun (local) or Docker
 - Cloudflare R2 bucket + S3 API token
 - Root stack running (`flaresolverr` + `opensubtitles-scraper` at ~10 req/s)
 
-## Setup
+## Local setup
 
 ```bash
 cd mirror
@@ -18,7 +17,7 @@ cp .env.example .env
 
 bun install
 docker compose up -d postgres
-bun run db:init   # safe to re-run; also applied on first Postgres boot via init SQL
+bun run db:init
 ```
 
 Download the official metadata export:
@@ -27,52 +26,78 @@ Download the official metadata export:
 
 ```bash
 mkdir -p data
-# place subtitles_all.txt.gz in data/
 bun run import-metadata -- ./data/subtitles_all.txt.gz
-```
-
-## Run the worker
-
-With scraper reachable at `OPENSUBTITLES_SCRAPER_URL` (default `http://127.0.0.1:8000`):
-
-```bash
-bun run worker
-```
-
-Or via Compose profile (talks to scraper on the host):
-
-```bash
-docker compose --profile worker up -d worker
-```
-
-Progress:
-
-```bash
+docker compose --profile worker up -d --build worker
 bun run status
 ```
 
-## VPS deploy (short)
+## Docker image (GHCR)
 
-1. Create R2 bucket + API token; put credentials in `mirror/.env`.
-2. On the VPS, start root compose (scraper @ 10 req/s) and mirror Postgres:
+Workflow [`.github/workflows/mirror-image.yml`](../.github/workflows/mirror-image.yml) builds `mirror/` and pushes:
+
+`ghcr.io/<github-username-or-org>/opensubtitles-mirror:latest`
+
+Triggers: push to default branch touching `mirror/**`, or manual **workflow_dispatch**.
+
+### Private repo — does that matter?
+
+**No Pro/Enterprise needed.** On GitHub Free you get Actions + Packages for private repos within quotas (roughly 2 000 Actions minutes/month and 500 MB Packages storage shared with artifacts).
+
+What _does_ matter:
+
+| Topic                     | Detail                                                                                                                      |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Building                  | Works with `GITHUB_TOKEN` in the workflow (`packages: write`)                                                               |
+| Image visibility          | GHCR package defaults to **private** — fine for a private archive                                                           |
+| Pulling on VPS / Dockhand | Host must `docker login ghcr.io` with a PAT that has `read:packages` (and `write:packages` only if you push from elsewhere) |
+| Minutes                   | Each build uses some Actions minutes; stay under Free quota or set a spending budget to $0                                  |
+
+Create a classic PAT (or fine-grained with Packages read) → on the VPS:
 
 ```bash
-docker compose up -d flaresolverr opensubtitles-scraper
-docker compose -f mirror/docker-compose.yml up -d postgres
+echo YOUR_PAT | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+docker pull ghcr.io/YOUR_USER/opensubtitles-mirror:latest
 ```
 
-3. Import metadata, then start the worker (host or `--profile worker`).
-4. Expect **~12 days** ideal at 10 req/s for ~10.7M files; **2–4+ weeks** with blocks/retries. Budget **~200–300 GB** R2.
+In Dockhand/Hawser, add the same registry credentials so pulls succeed.
+
+## Deploy compose (Dockhand)
+
+Use [`docker-compose.deploy.yml`](docker-compose.deploy.yml) — no bind mounts.
+
+1. Set stack env in Dockhand:
+
+```
+MIRROR_IMAGE=ghcr.io/YOUR_USER/opensubtitles-mirror:latest
+POSTGRES_PASSWORD=strong-password
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET=opensubtitles-mirror
+OPENSUBTITLES_SCRAPER_URL=http://opensubtitles-scraper:8000
+WORKER_RATE_PER_SECOND=10
+```
+
+2. Paste/deploy `docker-compose.deploy.yml` (or Git path `mirror/docker-compose.deploy.yml`).
+3. Worker entrypoint runs migrations, then the download loop.
+4. One-shot metadata import (after uploading `subtitles_all.txt.gz` into the container or a volume):
+
+```bash
+docker compose -f docker-compose.deploy.yml run --rm \
+  -v /path/to/subtitles_all.txt.gz:/data/subtitles_all.txt.gz:ro \
+  worker import-metadata /data/subtitles_all.txt.gz
+```
+
+Expect **~12 days** ideal at 10 req/s; **2–4+ weeks** realistic. Budget **~200–300 GB** R2.
 
 ## Layout
 
-| Path                          | Role                                    |
-| ----------------------------- | --------------------------------------- |
-| `sql/001_init.sql`            | Schema                                  |
-| `src/jobs/import-metadata.ts` | Bulk upsert from `subtitles_all.txt.gz` |
-| `src/jobs/download-worker.ts` | Resume-safe download → gzip → R2        |
-| `src/jobs/status.ts`          | Counts + ETA                            |
-| `src/storage/r2.ts`           | S3/R2 client                            |
-| `src/scraper/lavx.ts`         | LavX download client                    |
+| Path                        | Role                                       |
+| --------------------------- | ------------------------------------------ |
+| `Dockerfile`                | Production image                           |
+| `docker-compose.yml`        | Local Postgres + optional worker build     |
+| `docker-compose.deploy.yml` | Dockhand / VPS (GHCR image)                |
+| `sql/*.sql`                 | Schema (applied by `db-init` / entrypoint) |
+| `src/jobs/*`                | import / worker / status                   |
 
 Object key format: `subs/{external_id}.gz`.

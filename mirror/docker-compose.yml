@@ -11,7 +11,6 @@ services:
       POSTGRES_DB: opensubtitles_mirror
     volumes:
       - mirror_pg_data:/var/lib/postgresql/data
-      - ./sql/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U mirror -d opensubtitles_mirror']
       interval: 10s
@@ -20,12 +19,12 @@ services:
       start_period: 10s
 
   worker:
-    image: oven/bun:1.2-alpine
+    image: ${MIRROR_IMAGE:-opensubtitles-mirror:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: opensubtitles-mirror-worker
     restart: unless-stopped
-    working_dir: /app
-    volumes:
-      - ./:/app
     env_file:
       - .env
     environment:
@@ -40,7 +39,7 @@ services:
         condition: service_healthy
     extra_hosts:
       - 'host.docker.internal:host-gateway'
-    command: ['bun', 'run', 'src/jobs/download-worker.ts']
+    command: ['worker']
     profiles:
       - worker
 
