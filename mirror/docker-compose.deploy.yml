@@ -1,16 +1,45 @@
-# Production / Dockhand stack — no bind mounts; pull prebuilt image from GHCR.
+# Production / Dockhand stack — mirror + LavX scraper on one network.
 #
 # Required env:
 #   MIRROR_IMAGE=ghcr.io/<owner>/opensubtitles-mirror:latest
 #   R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET
-#   OPENSUBTITLES_SCRAPER_URL=http://opensubtitles-scraper:8000
-#
-# Metadata dump (importer service):
-#   METADATA_DUMP_URL=https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
+#   R2_PUBLIC_BASE_URL=https://pub-xxxx.r2.dev
+#   METADATA_DUMP_URL=https://dl.opensubtitles.org/addons/export/subtitles_month.txt.gz
 #
 # Private GHCR: docker login ghcr.io -u USER -p PAT (read:packages)
 
 services:
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=info
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8191/health']
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+
+  opensubtitles-scraper:
+    image: ghcr.io/lavx/opensubtitles-scraper:latest
+    restart: unless-stopped
+    depends_on:
+      flaresolverr:
+        condition: service_healthy
+    environment:
+      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
+      - SCRAPER_MIN_REQUEST_INTERVAL=0.1
+      - SCRAPER_RATE_LIMIT_PER_MINUTE=600
+      - SCRAPER_MAX_CONCURRENT_REQUESTS=10
+      - SCRAPER_MAX_INFLIGHT_REQUESTS=20
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 5
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -49,26 +78,27 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      opensubtitles-scraper:
+        condition: service_healthy
       importer:
         condition: service_completed_successfully
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-mirror}:${POSTGRES_PASSWORD:-mirror}@postgres:5432/${POSTGRES_DB:-opensubtitles_mirror}
-      OPENSUBTITLES_SCRAPER_URL: ${OPENSUBTITLES_SCRAPER_URL:-http://host.docker.internal:8000}
+      # Same compose network — do NOT use localhost / host.docker.internal here
+      OPENSUBTITLES_SCRAPER_URL: ${OPENSUBTITLES_SCRAPER_URL:-http://opensubtitles-scraper:8000}
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
       R2_BUCKET: ${R2_BUCKET:-opensubtitles-mirror}
       R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL}
       WORKER_RATE_PER_SECOND: ${WORKER_RATE_PER_SECOND:-10}
       WORKER_BATCH_SIZE: ${WORKER_BATCH_SIZE:-20}
       WORKER_MAX_RETRIES: ${WORKER_MAX_RETRIES:-5}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
     command: ['worker']
 
-  # Lightweight SQL UI — bind to localhost or put behind VPN/auth; do not expose publicly.
   adminer:
     image: adminer:4
     restart: unless-stopped

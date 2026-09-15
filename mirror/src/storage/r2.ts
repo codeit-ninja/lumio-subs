@@ -18,6 +18,10 @@ export function storageKeyFor(externalId: string | number): string {
 	return `subs/${externalId}.gz`;
 }
 
+export function publicUrlFor(publicBaseUrl: string, key: string): string {
+	return `${publicBaseUrl.replace(/\/+$/, '')}/${key.replace(/^\/+/, '')}`;
+}
+
 export async function objectExists(
 	client: S3Client,
 	bucket: string,

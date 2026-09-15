@@ -33,6 +33,7 @@ export type SubtitleRow = {
 	movie_kind: string | null;
 	series_season: number | null;
 	series_episode: number | null;
+	source_url: string | null;
 	download_url: string | null;
 	storage_key: string | null;
 	bytes_size: number | null;

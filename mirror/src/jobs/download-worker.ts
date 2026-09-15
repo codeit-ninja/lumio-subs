@@ -2,12 +2,19 @@ import { gzipSync } from 'node:zlib';
 
 import type { S3Client } from '@aws-sdk/client-s3';
 
+import type { Config } from '../config.ts';
 import { loadConfig } from '../config.ts';
 import type { SubtitleRow } from '../db.ts';
 import { closePool, getPool, waitForDatabase } from '../db.ts';
 import { createLogger } from '../logger.ts';
 import { LavxClient } from '../scraper/lavx.ts';
-import { createR2Client, objectExists, putGzipObject, storageKeyFor } from '../storage/r2.ts';
+import {
+	createR2Client,
+	objectExists,
+	publicUrlFor,
+	putGzipObject,
+	storageKeyFor
+} from '../storage/r2.ts';
 
 const log = createLogger('download-worker');
 
@@ -27,6 +34,14 @@ class RateLimiter {
 			await Bun.sleep(25);
 		}
 	}
+}
+
+function scrapeUrl(row: SubtitleRow): string {
+	return (
+		row.source_url?.trim() ||
+		row.download_url?.trim() ||
+		`https://www.opensubtitles.org/en/subtitles/${row.external_id}`
+	);
 }
 
 async function claimBatch(limit: number, maxRetries: number): Promise<SubtitleRow[]> {
@@ -62,6 +77,7 @@ async function claimBatch(limit: number, maxRetries: number): Promise<SubtitleRo
 async function markStored(
 	externalId: string,
 	storageKey: string,
+	downloadUrl: string,
 	bytesSize: number,
 	fileName: string | null
 ): Promise<void> {
@@ -71,14 +87,15 @@ async function markStored(
 		SET
 			status = 'stored',
 			storage_key = $2,
-			bytes_size = $3,
-			file_name = COALESCE($4, file_name),
+			download_url = $3,
+			bytes_size = $4,
+			file_name = COALESCE($5, file_name),
 			lease_until = NULL,
 			error = NULL,
 			updated_at = NOW()
 		WHERE external_id = $1
 		`,
-		[externalId, storageKey, bytesSize, fileName]
+		[externalId, storageKey, downloadUrl, bytesSize, fileName]
 	);
 }
 
@@ -125,22 +142,23 @@ async function processOne(
 	row: SubtitleRow,
 	lavx: LavxClient,
 	r2: S3Client,
-	bucket: string,
+	cfg: Config,
 	limiter: RateLimiter
 ): Promise<'stored' | 'failed' | 'skipped'> {
 	const key = storageKeyFor(row.external_id);
+	const r2Url = publicUrlFor(cfg.R2_PUBLIC_BASE_URL, key);
 
 	try {
-		if (await objectExists(r2, bucket, key)) {
-			await markStored(row.external_id, key, row.bytes_size ?? 0, row.file_name);
+		if (await objectExists(r2, cfg.R2_BUCKET, key)) {
+			await markStored(row.external_id, key, r2Url, row.bytes_size ?? 0, row.file_name);
 			return 'skipped';
 		}
 
 		await limiter.acquire();
-		const dl = await lavx.downloadSubtitle(row.external_id, row.download_url);
+		const dl = await lavx.downloadSubtitle(row.external_id, scrapeUrl(row));
 		const gzipped = gzipSync(Buffer.from(dl.bytes));
-		await putGzipObject(r2, bucket, key, new Uint8Array(gzipped));
-		await markStored(row.external_id, key, gzipped.byteLength, dl.filename || row.file_name);
+		await putGzipObject(r2, cfg.R2_BUCKET, key, new Uint8Array(gzipped));
+		await markStored(row.external_id, key, r2Url, gzipped.byteLength, dl.filename || row.file_name);
 		return 'stored';
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
@@ -157,9 +175,14 @@ async function workerLoop(): Promise<void> {
 	const r2 = createR2Client(cfg);
 	const limiter = new RateLimiter(cfg.WORKER_RATE_PER_SECOND);
 
-	const healthy = await lavx.health();
-	if (!healthy) {
-		log.warn({ url: cfg.OPENSUBTITLES_SCRAPER_URL }, 'LavX health check failed; continuing anyway');
+	const health = await lavx.health();
+	if (!health.ok) {
+		log.warn(
+			{ url: cfg.OPENSUBTITLES_SCRAPER_URL, detail: health.detail },
+			'LavX health check failed — downloads will fail until the scraper is reachable on the same Docker network'
+		);
+	} else {
+		log.info({ detail: health.detail }, 'LavX scraper reachable');
 	}
 
 	log.info(
@@ -167,7 +190,8 @@ async function workerLoop(): Promise<void> {
 			rate: cfg.WORKER_RATE_PER_SECOND,
 			concurrency: cfg.WORKER_CONCURRENCY,
 			batch: cfg.WORKER_BATCH_SIZE,
-			bucket: cfg.R2_BUCKET
+			bucket: cfg.R2_BUCKET,
+			publicBase: cfg.R2_PUBLIC_BASE_URL
 		},
 		'worker started'
 	);
@@ -191,7 +215,7 @@ async function workerLoop(): Promise<void> {
 				for (;;) {
 					const row = queue.shift();
 					if (!row) return;
-					const result = await processOne(row, lavx, r2, cfg.R2_BUCKET, limiter);
+					const result = await processOne(row, lavx, r2, cfg, limiter);
 					if (result === 'stored') stored += 1;
 					else if (result === 'failed') failed += 1;
 					else skipped += 1;

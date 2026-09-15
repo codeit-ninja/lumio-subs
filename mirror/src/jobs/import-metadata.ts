@@ -42,7 +42,7 @@ type ParsedRow = {
 	movie_kind: string | null;
 	series_season: number | null;
 	series_episode: number | null;
-	download_url: string | null;
+	source_url: string | null;
 };
 
 function normalizeImdb(raw: string | undefined): string | null {
@@ -90,7 +90,7 @@ function parseRawCols(rawCols: string[]): ParsedRow | null {
 		movie_kind: (movieKind ?? '').trim() || null,
 		series_season: toInt(seriesSeason),
 		series_episode: toInt(seriesEpisode),
-		download_url: (url ?? '').trim() || `https://www.opensubtitles.org/en/subtitles/${id}`
+		source_url: (url ?? '').trim() || `https://www.opensubtitles.org/en/subtitles/${id}`
 	};
 }
 
@@ -116,14 +116,14 @@ async function flushBatch(rows: ParsedRow[]): Promise<void> {
 			r.movie_kind,
 			r.series_season,
 			r.series_episode,
-			r.download_url
+			r.source_url
 		);
 	}
 
 	const sql = `
 		INSERT INTO subtitles (
 			external_id, language, format, release, file_name, imdb_id,
-			movie_name, movie_year, movie_kind, series_season, series_episode, download_url
+			movie_name, movie_year, movie_kind, series_season, series_episode, source_url
 		)
 		VALUES ${placeholders.join(',')}
 		ON CONFLICT (external_id) DO UPDATE SET
@@ -137,7 +137,7 @@ async function flushBatch(rows: ParsedRow[]): Promise<void> {
 			movie_kind = EXCLUDED.movie_kind,
 			series_season = EXCLUDED.series_season,
 			series_episode = EXCLUDED.series_episode,
-			download_url = EXCLUDED.download_url,
+			source_url = EXCLUDED.source_url,
 			updated_at = NOW()
 	`;
 

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS subtitles (
 	movie_kind TEXT,
 	series_season INTEGER,
 	series_episode INTEGER,
+	source_url TEXT,
 	download_url TEXT,
 	storage_key TEXT,
 	bytes_size INTEGER,

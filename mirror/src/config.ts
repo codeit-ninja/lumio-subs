@@ -8,6 +8,8 @@ const configSchema = z.object({
 	R2_SECRET_ACCESS_KEY: z.string().min(1),
 	R2_BUCKET: z.string().min(1).default('opensubtitles-mirror'),
 	R2_ENDPOINT: z.string().optional(),
+	/** Public base URL for objects, e.g. https://pub-xxx.r2.dev or https://subs.example.com */
+	R2_PUBLIC_BASE_URL: z.string().url(),
 	WORKER_RATE_PER_SECOND: z.coerce.number().positive().default(10),
 	WORKER_BATCH_SIZE: z.coerce.number().int().positive().default(20),
 	WORKER_MAX_RETRIES: z.coerce.number().int().nonnegative().default(5),
@@ -33,7 +35,8 @@ export function loadConfig(partial = false): Config {
 		OPENSUBTITLES_SCRAPER_URL: parsed.data.OPENSUBTITLES_SCRAPER_URL.replace(/\/+$/, ''),
 		R2_ENDPOINT:
 			parsed.data.R2_ENDPOINT?.trim() ||
-			`https://${parsed.data.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+			`https://${parsed.data.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+		R2_PUBLIC_BASE_URL: parsed.data.R2_PUBLIC_BASE_URL.replace(/\/+$/, '')
 	};
 
 	if (!partial) cached = cfg;

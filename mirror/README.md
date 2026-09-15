@@ -77,7 +77,20 @@ R2_BUCKET=opensubtitles-mirror
 OPENSUBTITLES_SCRAPER_URL=http://opensubtitles-scraper:8000
 WORKER_RATE_PER_SECOND=10
 METADATA_DUMP_URL=https://dl.opensubtitles.org/addons/export/subtitles_all.txt.gz
+R2_PUBLIC_BASE_URL=https://pub-xxxxxxxx.r2.dev
 ```
+
+The deploy compose includes **flaresolverr + opensubtitles-scraper** on the same network as the worker. Set:
+
+```
+OPENSUBTITLES_SCRAPER_URL=http://opensubtitles-scraper:8000
+```
+
+(`localhost` / `host.docker.internal` will fail inside the worker container.)
+
+- `source_url` — OpenSubtitles scrape URL (internal)
+- `download_url` — `https://…/subs/{id}.gz` (R2 public URL)
+- `storage_key` — `subs/{id}.gz`
 
 2. Paste/deploy `docker-compose.deploy.yml` (or Git path `mirror/docker-compose.deploy.yml`).
 3. **importer** downloads the dump (cached on `mirror_data`) and upserts into Postgres — can take hours the first time. **worker** starts only after importer exits successfully.
