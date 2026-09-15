@@ -43,5 +43,18 @@ services:
     profiles:
       - worker
 
+  adminer:
+    image: adminer:4
+    container_name: opensubtitles-mirror-adminer
+    restart: unless-stopped
+    ports:
+      - '${ADMINER_PORT:-8088}:8080'
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha-dark
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   mirror_pg_data:

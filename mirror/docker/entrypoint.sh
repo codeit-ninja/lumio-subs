@@ -16,8 +16,12 @@ case "$cmd" in
 		exec bun run src/jobs/download-worker.ts "$@"
 		;;
 	import-metadata)
+		echo "Applying database migrations..."
 		bun run src/jobs/db-init.ts
-		exec bun run src/jobs/import-metadata.ts "$@"
+		echo "Importing metadata dump..."
+		# Fail the container clearly if download/import blows up (Dockhand shows exited + logs)
+		bun run src/jobs/import-metadata.ts "$@"
+		echo "Metadata import finished successfully."
 		;;
 	status)
 		exec bun run src/jobs/status.ts "$@"

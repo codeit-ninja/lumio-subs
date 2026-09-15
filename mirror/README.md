@@ -99,6 +99,47 @@ Note: `dl.opensubtitles.org` sits behind Cloudflare; downloads from a VPS/datace
 
 Expect **~12 days** ideal at 10 req/s; **2–4+ weeks** realistic. Budget **~200–300 GB** R2.
 
+## Inspect the database
+
+### Adminer (in compose)
+
+Both compose files include **Adminer** on port `8088` (override with `ADMINER_PORT`).
+
+1. Open `http://localhost:8088` (or your VPS IP / tunnel).
+2. System: **PostgreSQL**
+3. Server: `postgres` (Docker network name; from your laptop against published `5433` use `host.docker.internal` only inside containers — from browser use the host you published)
+4. Username / password / database: `mirror` / your `POSTGRES_PASSWORD` / `opensubtitles_mirror`
+
+From the browser on the same Docker host, Server is usually `postgres` when Adminer is in the same compose network (default).
+
+**Security:** Adminer only has DB credentials as gate. Do not expose `8088` publicly; use SSH tunnel, VPN, or Dockhand localhost bind.
+
+```bash
+# SSH tunnel example
+ssh -L 8088:127.0.0.1:8088 user@your-vps
+# then open http://localhost:8088
+```
+
+Useful queries:
+
+```sql
+SELECT status, COUNT(*) FROM subtitles GROUP BY status;
+SELECT * FROM subtitles WHERE status = 'stored' ORDER BY updated_at DESC LIMIT 50;
+SELECT * FROM worker_stats;
+```
+
+### CLI / desktop
+
+```bash
+# psql into the container
+docker compose exec postgres psql -U mirror -d opensubtitles_mirror
+
+# or from host (local compose publishes 5433)
+psql postgres://mirror:mirror@localhost:5433/opensubtitles_mirror
+```
+
+Desktop clients (TablePlus, DBeaver, pgAdmin, DataGrip) can connect to `localhost:5433` locally, or via SSH tunnel to the VPS.
+
 ## Layout
 
 | Path                        | Role                                       |
