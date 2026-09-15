@@ -1,0 +1,39 @@
+---
+description: Always use Iconify via our Icon component for icons; register sets in icons.ts
+globs: "**/*.{svelte,ts}"
+alwaysApply: false
+---
+
+# Icons: always Iconify
+
+All icons must come from [Iconify](https://iconify.design) through our shared `Icon` wrapper. Do not use inline SVG icons, emoji-as-icons, lucide-svelte, or other icon libraries.
+
+## Patterns
+
+- Import `Icon` from `#lib/components/ui/icon/index.js`.
+- Pass an Iconify id: `prefix:name` (e.g. `lucide:star`, `selfhst:imdb`).
+- Style with Tailwind on `class` (`size-4`, `text-rating`, brand colors, etc.).
+- Register new icon sets in [`src/lib/icons.ts`](src/lib/icons.ts) via `@iconify-json/<set>` + `addCollection` before using them.
+
+```svelte
+<!-- ✅ GOOD -->
+<script lang="ts">
+	import { Icon } from '#lib/components/ui/icon/index.js';
+</script>
+
+<Icon icon="lucide:play" class="size-3.5 shrink-0" />
+<a href={imdbHref} aria-label="View on IMDb">
+	<Icon icon="selfhst:imdb" class="h-4 w-auto" />
+</a>
+```
+
+```svelte
+<!-- ❌ BAD — inline SVG / other icon packages -->
+<svg viewBox="0 0 24 24">…</svg>
+```
+
+## Do not
+
+- Hand-roll icon SVGs in components
+- Import icons from `lucide-svelte`, `svelte-icons`, etc.
+- Use Iconify ids whose collection is not registered in `icons.ts`

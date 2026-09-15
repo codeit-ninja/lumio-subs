@@ -1,0 +1,62 @@
+services:
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    container_name: lumio-subs-pocketbase
+    restart: unless-stopped
+    ports:
+      - '8093:8090'
+    environment:
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
+    volumes:
+      - ./pocketbase/pb_data:/pb_data
+      - ./pocketbase/pb_migrations:/pb_migrations
+      - ./pocketbase/pb_hooks:/pb_hooks
+      - ./src/lib/pocketbase:/pb_schema
+    command:
+      - --migrationsDir=/pb_migrations
+      - --hooksDir=/pb_hooks
+    healthcheck:
+      test:
+        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:8090/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: lumio-subs-flaresolverr
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=info
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8191/health']
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+
+  opensubtitles-scraper:
+    image: ghcr.io/lavx/opensubtitles-scraper:latest
+    container_name: lumio-subs-opensubtitles-scraper
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    depends_on:
+      flaresolverr:
+        condition: service_healthy
+    environment:
+      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
+      # Outbound → opensubtitles.org (10 req/s)
+      - SCRAPER_MIN_REQUEST_INTERVAL=0.1
+      - SCRAPER_RATE_LIMIT_PER_MINUTE=600
+      - SCRAPER_MAX_CONCURRENT_REQUESTS=10
+      # Inbound → app / mirror worker
+      - SCRAPER_MAX_INFLIGHT_REQUESTS=20
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 5

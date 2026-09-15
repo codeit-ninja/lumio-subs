@@ -1,0 +1,26 @@
+---
+description: After every edit, run Prettier and ESLint --fix on changed files
+alwaysApply: true
+---
+
+# Format after every edit
+
+After creating or editing files, always format and autofix them before finishing the turn.
+
+## Commands
+
+Run on the **exact files you changed** (not the whole repo), from the **repo root**.
+Root `prettier.config.js` and `eslint.config.js` apply to the entire monorepo:
+
+```bash
+bunx prettier --write <file1> <file2> ...
+bunx eslint --fix <file1> <file2> ...
+```
+
+## Rules
+
+- Do this after **every** batch of edits in a turn — do not wait for the user to ask.
+- Only pass files you actually wrote or modified.
+- Skip non-lintable paths (e.g. `.env`, lockfiles, binary assets, `AGENTS.md` unless Prettier handles them).
+- If ESLint or Prettier fails, fix the reported issues and re-run until clean.
+- Prefer `--fix` / `--write` over check-only; do not leave formatting or fixable lint debt.

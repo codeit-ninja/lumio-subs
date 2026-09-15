@@ -1,0 +1,13 @@
+node_modules
+.svelte-kit
+build
+dist
+.env
+.env.*
+!.env.example
+pocketbase/pb_data/*
+!pocketbase/pb_data/.gitkeep
+mirror/node_modules
+mirror/data
+.DS_Store
+*.log

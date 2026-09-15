@@ -1,0 +1,50 @@
+---
+description: Prefer existing UI components; extract reusable ones when warranted
+alwaysApply: true
+---
+
+# Components: prefer existing, extract when reusable
+
+Before writing markup for interactive or repeated UI, **look for an existing component** in `$lib/components` (especially `ui/`). Use it instead of a raw HTML element with one-off classes.
+
+## Order of preference
+
+1. **Existing app component** — e.g. `Button`, `Icon`, `Dialog`, domain compounds under `components/<domain>/`
+2. **bits-ui primitive** wrapped in our `ui/` layer — see [`components-bits-ui`](components-bits-ui.mdc)
+3. **New reusable component** — only when no fit exists and you judge the UI will be reused (same pattern in 2+ places, shared chrome, or a clear design-system primitive)
+
+```svelte
+<!-- ✅ GOOD — use the shared Button -->
+<script lang="ts">
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Icon } from '#lib/components/ui/icon/index.js';
+</script>
+
+<Button type="button" variant="secondary" size="sm" onclick={goBack}>
+	<Icon icon="lucide:arrow-left" class="size-4 shrink-0" />
+	Go Back
+</Button>
+```
+
+```svelte
+<!-- ❌ BAD — hand-rolled button when Button already exists -->
+<button type="button" class="inline-flex … rounded-full border …" onclick={goBack}>
+	…
+</button>
+```
+
+## When to create a new reusable component
+
+Create one under `components/ui/` (generic) or `components/<domain>/` (domain-specific) when:
+
+- The same control/layout will appear in multiple screens, **or**
+- You are about to copy-paste non-trivial markup/styles, **or**
+- Accessibility/behavior belongs in one place (focus, keyboard, open state)
+
+Do **not** extract a one-off that is only used once and has no clear second consumer.
+
+## Do not
+
+- Invent a raw `<button>`, `<select>`, dialog, or menu when `ui/` already covers it
+- Bypass `Button` / `Icon` / other `ui` primitives with custom Tailwind chrome “just for this screen”
+- Duplicate near-identical markup across files instead of extracting a shared component

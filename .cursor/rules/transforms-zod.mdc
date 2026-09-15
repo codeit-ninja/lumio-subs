@@ -1,0 +1,75 @@
+---
+description: Transform external/API records into domain shapes with Zod schemas, not hand-rolled mappers
+globs: "**/*.{ts,svelte.ts}"
+alwaysApply: false
+---
+
+# Transforms: always Zod
+
+All transforms from raw/external data (PocketBase records, HTTP JSON, scraper payloads, etc.) into app/domain shapes must go through a **Zod schema**. Do not hand-roll `typeof` / field-copy mappers.
+
+## Patterns
+
+- Define a schema (`z.object`, …) next to the type; export `type X = z.infer<typeof xSchema>`.
+- Prefer `safeParse` (or a small `parseX` helper) over throwing `parse` in services.
+- Put shared client+server shapes in `#lib/...` (not under `server/`). Server-only transforms stay under `#lib/server`.
+- Services own the transform call and return `Result` / `ResultAsync` (neverthrow) — load functions and remotes call the service, they do not re-implement mapping.
+
+```typescript
+// ✅ GOOD — schema + parse helper
+import { z } from 'zod';
+
+export const appUserSchema = z.object({
+	id: z.string().min(1),
+	email: z.string().default(''),
+	name: z
+		.string()
+		.nullish()
+		.transform((value) => value ?? null)
+});
+
+export type AppUser = z.infer<typeof appUserSchema>;
+
+export function parseAppUser(raw: unknown): AppUser | null {
+	const result = appUserSchema.safeParse(raw);
+	return result.success ? result.data : null;
+}
+```
+
+```typescript
+// ✅ GOOD — service uses the schema
+import type { AppError } from '#lib/server/result.js';
+import { ERROR_CODE, panic } from '#lib/server/result.js';
+
+currentUser(): Result<AppUser | null, AppError> {
+	const record = this.ctx.locals.user;
+	if (!record) {
+		return ok(null);
+	}
+
+	const user = parseAppUser(record);
+	if (!user) {
+		return panic(ERROR_CODE.AUTH_INVALID_USER, 500, 'Invalid authenticated user record');
+	}
+
+	return ok(user);
+}
+```
+
+```typescript
+// ❌ BAD — manual typeof mapper
+function toAppUser(record: RecordModel): AppUser {
+	return {
+		id: record.id,
+		email: typeof record.email === 'string' ? record.email : '',
+		name: typeof record.name === 'string' ? record.name : null
+	};
+}
+```
+
+## Do not
+
+- Copy fields with ad-hoc `typeof` / `in` checks when Zod can describe the shape
+- Transform in `+layout.server` / `+page.server` / remotes when a service method should own it
+- Duplicate the same mapper in client and server modules
+- Use Valibot or another schema library — prefer Zod

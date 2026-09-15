@@ -1,0 +1,44 @@
+---
+description: Base UI components on bits-ui primitives; check bits-ui before inventing
+globs: "**/components/**/*.svelte"
+alwaysApply: false
+---
+
+# Components: base on bits-ui
+
+Before building interactive UI (buttons, dialogs, menus, selects, tabs, etc.), check [bits-ui](https://bits-ui.com) for an existing primitive. Wrap that primitive in our `$lib/components/ui` layer — do not reimplement accessibility, focus, or keyboard behavior from scratch.
+
+## Patterns
+
+- Import the bits-ui primitive (e.g. `Button as ButtonPrimitive`).
+- Extend primitive props (`ButtonPrimitive.RootProps`) and add our variants/sizes.
+- Use Svelte 5 runes (`$props`, `$derived`, snippets).
+- Put shared UI under `src/lib/components/ui/<name>/` with `index.ts` re-exports.
+- Style with Tailwind + [tailwind-variants](https://www.tailwind-variants.org/) recipes (`*.styles.ts`); keep behavior in bits-ui.
+
+```svelte
+<!-- ✅ GOOD — wrap bits-ui + tv recipe -->
+<script lang="ts">
+	import { Button as ButtonPrimitive } from 'bits-ui';
+	import type { Snippet } from 'svelte';
+	import type { ButtonVariantProps } from './button.styles.js';
+	import { buttonVariants } from './button.styles.js';
+
+	type Props = ButtonPrimitive.RootProps & ButtonVariantProps & { children?: Snippet };
+
+	const { variant = 'primary', size = 'md', class: className, children, ...restProps }: Props =
+		$props();
+
+	const slots = $derived(buttonVariants({ variant, size }));
+</script>
+
+<ButtonPrimitive.Root {...restProps} class={slots.base({ class: className })}>
+	{@render children?.()}
+</ButtonPrimitive.Root>
+```
+
+## Do not
+
+- Build custom click/focus/escape handling when bits-ui already provides it
+- Use a different headless UI library for the same role
+- Put one-off styled primitives only in a route — prefer `components/ui` when reusable

@@ -1,0 +1,42 @@
+---
+description: Use neverthrow Result/ResultAsync for all service methods
+globs: "**/*.service.ts"
+alwaysApply: false
+---
+
+# Services: always neverthrow
+
+Service methods must return `Result` or `ResultAsync` from `neverthrow`. Do not throw for expected failures (auth, validation, PocketBase errors).
+
+For **where** external APIs / debrid providers live and how they register on `Services`, see [`services-external-apis`](services-external-apis.mdc).
+
+## Patterns
+
+- Extend `Service` from `$lib/server/base.service`.
+- Prefer `ResultAsync` for async work.
+- Map PocketBase promises with `fromPb` from `$lib/server/result` so errors become typed `AppError`.
+- Every `AppError` must include a unique, grep-able `code` (via `ERROR_CODE` + `panic` / `httpError` / `configError`). Never invent ad-hoc `{ kind, message }` objects without a code.
+- Surface errors to clients with `formatAppError` so the code stays visible.
+- Callers handle `.match` / `.map` / `.mapErr` — never swallow errors with empty catches.
+
+```typescript
+// ❌ BAD — throws / bare Promise
+async login(email: string, password: string) {
+  return this.pocketbase.collection('users').authWithPassword(email, password);
+}
+
+// ✅ GOOD — ResultAsync + fromPb
+import { fromPb } from './result';
+
+login(email: string, password: string) {
+  return fromPb(
+    this.pocketbase.collection('users').authWithPassword(email, password)
+  );
+}
+```
+
+## Do not
+
+- Return raw promises that reject for domain errors
+- Use try/catch only to rethrow untyped errors when `fromPb` / `ResultAsync.fromPromise` fits
+- Mix throwing APIs with Result-returning methods in the same service without a clear boundary

@@ -1,0 +1,46 @@
+---
+description: External API / debrid providers must be Service classes on the Services facade
+alwaysApply: true
+---
+
+# Services: external APIs & debrid
+
+Third-party HTTP providers (debrid, metadata APIs, scrapers with API keys, etc.) belong in **service classes**, not ad-hoc client modules.
+
+## Where
+
+- File: `src/lib/server/<name>.service.ts` (e.g. `torbox.service.ts`, `tmdb.service.ts`)
+- Class: `export class FooService extends Service`
+- Register on [`src/lib/server/services.ts`](src/lib/server/services.ts): `foo() { return new FooService(); }`
+- Call sites (remotes, `+page.server`, hooks): `locals.services.foo()` via `getRequestEvent()` / `locals`
+
+## Patterns
+
+- Follow [`services-neverthrow`](services-neverthrow.mdc): methods return `Result` / `ResultAsync`, typed `AppError` with stable `ERROR_CODE`s
+- Prefer an **official SDK** when one exists (e.g. `@torbox/torbox-api`); wrap it in the service — do not re-export the SDK from remotes
+- Config via `$app/env/private` + `requireConfig` / `isConfigured()` when optional
+- Soft fallbacks (e.g. debrid miss → WebTorrent) belong in the **caller** or an explicit service method that documents soft-fail — never throw untyped errors across the remote boundary
+
+```typescript
+// ✅ GOOD
+const torbox = locals.services.torbox();
+if (torbox.isConfigured()) {
+	const cached = await torbox.checkCached(hashes).unwrapOr(new Map());
+	const resolved = await torbox.resolveCachedDownload(magnet, hash);
+	if (resolved.isOk()) { /* use resolved.value */ }
+}
+```
+
+```typescript
+// ❌ BAD — parallel client folder / free functions
+import { checkCached } from '#lib/server/torbox/client.js';
+// ❌ BAD — raw SDK in a remote
+import { TorboxApi } from '@torbox/torbox-api';
+```
+
+## Do not
+
+- Add `src/lib/server/<vendor>/client.ts` (or similar) for a new provider
+- Call external APIs directly from `*.remote.ts` / `+page.server.ts` when a service should own them
+- Hand-roll fetch wrappers when an official SDK covers the endpoints we need
+- Skip registering the service on `Services`

@@ -1,0 +1,118 @@
+/*
+ * Lumio solid product theme
+ * Canonical visual language: dark, sharp surfaces — Vercel/Cloudflare-like.
+ * Color palette preserved from the prior Lumio design refs.
+ */
+
+@theme {
+	/* Neutrals / surfaces */
+	--color-background: #09090b;
+	--color-foreground: #ffffff;
+	--color-muted: #a1a1aa;
+	--color-surface: #18181b;
+	--color-surface-elevated: #27272a;
+
+	/* Borders */
+	--color-border: #27272a;
+	--color-border-strong: #3f3f46;
+
+	/* Primary — purple (CTA / brand) */
+	--color-primary-50: #f3eeff;
+	--color-primary-100: #e9deff;
+	--color-primary-200: #d4bcff;
+	--color-primary-300: #b78fff;
+	--color-primary-400: #9b62f7;
+	--color-primary-500: #7c3aed;
+	--color-primary-600: #6825d4;
+	--color-primary-700: #571baf;
+	--color-primary-800: #47178e;
+	--color-primary-900: #3a1570;
+	--color-primary-950: #220a4a;
+	--color-primary: var(--color-primary-500);
+
+	/* Accents from design refs */
+	--color-rating: #fbbf24;
+	--color-favorite: #ff4d8d;
+
+	/* Gray scale */
+	--color-gray-50: #fafafa;
+	--color-gray-100: #f4f4f5;
+	--color-gray-200: #e4e4e7;
+	--color-gray-300: #d4d4d8;
+	--color-gray-400: #a1a1aa;
+	--color-gray-500: #71717a;
+	--color-gray-600: #52525b;
+	--color-gray-700: #3f3f46;
+	--color-gray-800: #27272a;
+	--color-gray-900: #18181b;
+	--color-gray-950: #09090b;
+
+	/* Radii — tight / product UI */
+	--radius-input: 0.5rem;
+	--radius-badge: 0.375rem;
+	--radius-button: 0.5rem;
+	--radius-card: 0.5rem;
+}
+
+@layer base {
+	:root {
+		--lumio-bg: var(--color-background);
+		--lumio-fg: var(--color-foreground);
+		--lumio-muted: var(--color-muted);
+		--lumio-primary: var(--color-primary-500);
+		--lumio-rating: var(--color-rating);
+		--lumio-favorite: var(--color-favorite);
+		--lumio-border: var(--color-border);
+		--lumio-surface: var(--color-surface);
+	}
+
+	html {
+		/* Scale rem-based type, spacing, and controls on large screens */
+		font-size: clamp(16px, 0.75rem + 0.35vw, 18px);
+	}
+
+	html,
+	body {
+		background-color: var(--color-background);
+		color: var(--color-foreground);
+	}
+}
+
+@layer components {
+	.field-input {
+		width: 100%;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-input);
+		color: var(--color-foreground);
+		font-size: 0.875rem;
+		line-height: 1.5;
+		padding: 0.5rem 0.75rem;
+		outline: none;
+		transition:
+			border-color 150ms ease,
+			background 150ms ease;
+	}
+
+	.field-input::placeholder {
+		color: var(--color-muted);
+	}
+
+	.field-input:hover:not(:disabled) {
+		border-color: var(--color-border-strong);
+	}
+
+	.field-input:focus-visible {
+		border-color: var(--color-primary-400);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-500) 28%, transparent);
+	}
+
+	.field-input[aria-invalid='true'] {
+		border-color: color-mix(in srgb, var(--color-favorite) 55%, transparent);
+	}
+
+	.field-input:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+}

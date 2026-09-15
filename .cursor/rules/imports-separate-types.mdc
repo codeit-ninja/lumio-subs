@@ -1,0 +1,32 @@
+---
+description: Always import types via a separate `import type` statement
+globs: **/*.{ts,js,svelte}
+alwaysApply: false
+---
+
+# Imports: separate type imports
+
+Types must always be imported with a dedicated `import type { … }` statement. Never mix types and values in the same import (no inline `type` modifiers).
+
+## Patterns
+
+```typescript
+// ✅ GOOD — types and values in separate imports
+import type { AppError, Result } from './result';
+import { ERROR_CODE, fromPb, panic } from './result';
+
+import type { AppUser } from '#lib/auth/user.js';
+import { parseAppUser } from '#lib/auth/user.js';
+```
+
+```typescript
+// ❌ BAD — inline `type` in a value import
+import { type AppError, ERROR_CODE, fromPb, panic } from './result';
+import { type AppUser, parseAppUser } from '#lib/auth/user.js';
+import { ok, type Result, type ResultAsync } from 'neverthrow';
+```
+
+## Do not
+
+- Use `import { type X, y }` or `import { x, type Y }`
+- Prefer a single mixed import over two separate ones for the same module

@@ -1,0 +1,15 @@
+{
+	"$schema": "./schema.json",
+	"exposeEndpoint": false,
+	"tsSchema": {
+		"generateFile": true,
+		"includeDocs": true,
+		"includeSystemCollections": false,
+		"outputPath": "/pb_schema/types.ts"
+	},
+	"zodSchema": {
+		"generateFile": true,
+		"includeSystemCollections": false,
+		"outputPath": "/pb_schema/zod.ts"
+	}
+}

@@ -1,0 +1,39 @@
+---
+description: Never use PocketBase JS hooks for app domain logic — use services, remotes, and migrations
+alwaysApply: true
+---
+
+# PocketBase: no hooks
+
+Do **not** put application domain logic, CRUD side-effects, or business rules in PocketBase JS hooks (`pb_hooks/`). Hooks are hard to test, opaque in the monorepo workflow, and drift from our typed service layer.
+
+## Where logic belongs
+
+| Concern | Place |
+| --- | --- |
+| Schema / collections / indexes / API rules | [`pocketbase/pb_migrations/`](pocketbase/pb_migrations/) |
+| CRUD, auth-gated writes, transforms | `*.service.ts` on [`Services`](src/lib/server/services.ts) via `fromPb` + Zod |
+| Client entrypoints | remotes (`query` / `command` / `form`) or `+page.server` → `locals.services.*()` |
+
+Follow [`services-neverthrow`](services-neverthrow.mdc) and [`transforms-zod`](transforms-zod.mdc). Pattern reference: [`AuthService`](src/lib/server/auth.service.ts).
+
+```typescript
+// ✅ GOOD — domain write in a service
+upsertProgress(input: UpsertWatchProgress) {
+	return fromPb(this.pocketbase.collection('watch_progress').create({ … }));
+}
+```
+
+```javascript
+// ❌ BAD — pb_hooks onRecord* / cron for app behavior
+onRecordAfterCreateSuccess((e) => { /* side effects */ }, 'watch_progress');
+```
+
+## Do not
+
+- Add files under `pocketbase/pb_hooks/` for app features
+- Use `onRecord*`, `onCollection*`, or scheduled hooks to enforce business rules
+- Bypass services by writing PocketBase records directly from remotes when a service should own the collection
+- Change schemas only in the Admin UI without a checked-in migration (prefer `pb_migrations/`)
+
+`pb_hooks/` stays empty for **app features**. Exception: the checked-in [pocketbase-schema-generator](https://github.com/satohshi/pocketbase-schema-generator) under `pb_hooks/` may generate TypeScript + Zod schemas only — no domain CRUD or business rules.
