@@ -48,12 +48,12 @@ services:
         condition: service_healthy
     environment:
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
-      # Outbound → opensubtitles.org (10 req/s)
-      - SCRAPER_MIN_REQUEST_INTERVAL=0.1
-      - SCRAPER_RATE_LIMIT_PER_MINUTE=600
-      - SCRAPER_MAX_CONCURRENT_REQUESTS=10
+      # Outbound → opensubtitles.org (keep low to reduce CAPTCHA / 429)
+      - SCRAPER_MIN_REQUEST_INTERVAL=1.5
+      - SCRAPER_RATE_LIMIT_PER_MINUTE=30
+      - SCRAPER_MAX_CONCURRENT_REQUESTS=2
       # Inbound → app / mirror worker
-      - SCRAPER_MAX_INFLIGHT_REQUESTS=20
+      - SCRAPER_MAX_INFLIGHT_REQUESTS=5
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s

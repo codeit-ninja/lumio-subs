@@ -21,14 +21,9 @@ export function allProviders(): SubtitleProvider[] {
 	];
 }
 
-export function resolveProviders(sources?: string[]): SubtitleProvider[] {
-	const providers = allProviders();
-	if (!sources?.length || sources.includes('all')) {
-		return providers;
-	}
-
-	const wanted = new Set(sources.map((s) => s.trim().toLowerCase()).filter(Boolean));
-	return providers.filter((p) => wanted.has(p.id));
+/** Always returns every registered provider (aggregator — no client source filter). */
+export function resolveProviders(): SubtitleProvider[] {
+	return allProviders();
 }
 
 export function getProvider(id: string): SubtitleProvider | null {
@@ -48,27 +43,4 @@ export function recordProviderHealth(
 		lastError,
 		lastCheckedAt: new Date().toISOString()
 	});
-}
-
-export function getProviderHealth(): ProviderHealth[] {
-	return allProviders().map((p) => {
-		const existing = healthStore.get(p.id);
-		return (
-			existing ?? {
-				id: p.id,
-				ok: true,
-				latencyMs: null,
-				lastError: null,
-				lastCheckedAt: new Date(0).toISOString()
-			}
-		);
-	});
-}
-
-export function listSources() {
-	return allProviders().map((p) => ({
-		id: p.id,
-		name: p.name,
-		supports: p.supports
-	}));
 }

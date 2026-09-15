@@ -29,6 +29,10 @@ Create the PocketBase admin on first boot if the container does not auto-create 
 
 ## API
 
+Gated `/api/*` routes (search + subtitle download) require an API key or signed-in session:
+`Authorization: Bearer <apiKey>` or `X-API-Key: <apiKey>`. Plan rate limits apply per user.
+Only `/api/stripe/webhook` is public.
+
 Errors on `/api/*` always return JSON:
 
 ```json
@@ -37,15 +41,13 @@ Errors on `/api/*` always return JSON:
 
 ### `GET /api/search`
 
-| Param     | Description                                    |
-| --------- | ---------------------------------------------- |
-| `imdb`    | IMDb id (`tt…`) — preferred                    |
-| `tmdb`    | TMDB numeric id                                |
-| `s` / `e` | Season / episode (TV)                          |
-| `lang`    | ISO language (default `en`)                    |
-| `sources` | Comma list or `all`                            |
-| `refresh` | `true` to re-scrape and replace stored results |
-| `type`    | `movie` \| `tv`                                |
+| Param     | Description                 |
+| --------- | --------------------------- |
+| `imdb`    | IMDb id (`tt…`) — preferred |
+| `tmdb`    | TMDB numeric id             |
+| `s` / `e` | Season / episode (TV)       |
+| `lang`    | ISO language (default `en`) |
+| `type`    | `movie` \| `tv`             |
 
 Response:
 
@@ -57,28 +59,24 @@ Response:
 			"language": "en",
 			"format": "vtt",
 			"release": "…",
-			"fileName": "…",
 			"downloadUrl": "https://…r2.cloudflarestorage.com/bucket/…/….vtt"
 		}
 	]
 }
 ```
 
-`downloadUrl` is a direct R2 object URL once the subtitle file is stored in PocketBase (S3/R2 backend). Until then it is `/api/subtitles/:id`.
+`downloadUrl` is a direct R2 object URL once the subtitle file is stored in PocketBase (S3/R2 backend). Until then it is `/api/subtitles/:id`. Results do not expose the upstream provider.
 
-Search returns stored rows from the database when present. On a miss (or `refresh=true`), providers are scraped, files are downloaded and stored permanently, then results are returned.
+Search returns stored rows when a previous scrape is still fresh. On a miss (or when the media TTL has expired), **all** providers are scraped, new unique subtitles are appended, and the full set for that key is returned. IMDb ids are stored in `media` after the first successful resolve; release date drives refresh frequency:
+
+- Released under 30 days ago: every 1 day
+- Released under 1 year ago: every 7 days
+- Released under 5 years ago: every 30 days
+- Older / unknown: every 90 days
 
 ### `GET /api/subtitles/:id?format=vtt|srt`
 
 Serves a stored subtitle: **302** to the R2 URL for `format=vtt` (default). `format=srt` streams a converted body from the stored VTT. If a row is missing its file, the provider is used once as a fallback warm path.
-
-### `GET /api/sources`
-
-Enabled providers and capabilities.
-
-### `GET /api/status`
-
-In-memory provider health (latency / last error).
 
 ## Providers (v1)
 
@@ -88,8 +86,7 @@ In-memory provider health (latency / last error).
 4. Subf2m (scrape)
 5. TVSubtitles (TV, scrape)
 
-Permanent store: search misses scrape providers, download files eagerly, and save metadata + VTT
-in PocketBase/R2. Existing rows are returned as-is until `refresh=true` replaces them.
+Permanent store: first search (and later TTL refreshes) scrape providers, download files eagerly, and save metadata + VTT in PocketBase/R2. Existing rows are kept; refreshes only add new unique hits.
 
 ## Env
 

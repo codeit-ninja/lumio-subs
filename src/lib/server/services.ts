@@ -2,6 +2,7 @@ import { ApiKeyService } from './api-key.service';
 import { AuthService } from './auth.service';
 import { CacheService } from './cache.service';
 import { MailService } from './mail.service';
+import { MediaService } from './media.service';
 import { StripeService } from './stripe.service';
 import { SubscriptionService } from './subscription.service';
 import { SubtitleService } from './subtitle.service';
@@ -22,6 +23,10 @@ export class Services {
 
 	cache() {
 		return new CacheService();
+	}
+
+	media() {
+		return new MediaService();
 	}
 
 	subtitles() {

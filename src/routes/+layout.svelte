@@ -6,6 +6,8 @@
 
 	import type { AppUser } from '#lib/auth/user.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import type { DropdownMenuItem } from '#lib/components/ui/dropdown-menu/index.js';
+	import { DropdownMenu } from '#lib/components/ui/dropdown-menu/index.js';
 	import { Icon } from '#lib/components/ui/icon/index.js';
 	import { page } from '$app/state';
 
@@ -20,6 +22,23 @@
 	const isAuthShell = $derived(
 		page.url.pathname === '/login' || page.url.pathname.startsWith('/verify')
 	);
+
+	const accountMenuItems = $derived.by((): DropdownMenuItem[] => [
+		{
+			id: 'dashboard',
+			label: 'Dashboard',
+			href: '/dashboard',
+			icon: 'lucide:layout-dashboard'
+		},
+		{
+			id: 'logout',
+			label: 'Log out',
+			icon: 'lucide:log-out',
+			form: { ...logout },
+			disabled: logout.pending > 0,
+			loading: logout.pending > 0
+		}
+	]);
 
 	let portalPending = $state(false);
 
@@ -63,7 +82,6 @@
 					<a class="hover:text-foreground" href="/#pricing">Pricing</a>
 					<a class="hover:text-foreground" href="/docs">Docs</a>
 					{#if data.user}
-						<span class="hidden text-muted sm:inline">{data.user.email}</span>
 						{#if data.hasPaidSubscription}
 							<Button
 								type="button"
@@ -78,14 +96,16 @@
 								Billing
 							</Button>
 						{/if}
-						<form {...logout}>
-							<Button type="submit" variant="ghost" size="sm" loading={logout.pending > 0}>
-								{#if !logout.pending}
-									<Icon icon="lucide:log-out" class="size-3.5 shrink-0" />
-								{/if}
-								Log out
-							</Button>
-						</form>
+						<DropdownMenu
+							header={data.user.email}
+							items={accountMenuItems}
+							aria-label="Account"
+							triggerClass="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-muted hover:border-border-strong hover:bg-surface-elevated hover:text-foreground"
+						>
+							{#snippet trigger()}
+								<Icon icon="lucide:user" class="size-4 shrink-0" />
+							{/snippet}
+						</DropdownMenu>
 					{:else}
 						<Button href="/login" size="sm">
 							<Icon icon="lucide:log-in" class="size-3.5 shrink-0" />

@@ -4,7 +4,7 @@ import { apiError } from '#lib/server/api-response.js';
 import { consumeRateLimit } from '#lib/server/rate-limit.js';
 import { ERROR_CODE } from '#lib/server/result.js';
 
-const PUBLIC_API_PREFIXES = ['/api/status', '/api/sources', '/api/stripe/webhook'];
+const PUBLIC_API_PREFIXES = ['/api/stripe/webhook'];
 
 function isGatedApiPath(pathname: string): boolean {
 	if (!pathname.startsWith('/api/')) return false;

@@ -2,13 +2,19 @@
 	import type { Snippet } from 'svelte';
 
 	import { DocsPager, DocsSidebar } from '#lib/components/docs/index.js';
+	import { CfFrame } from '#lib/components/marketing/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Icon } from '#lib/components/ui/icon/index.js';
 	import { afterNavigate } from '$app/navigation';
+	import { page } from '$app/state';
 
 	let { children }: { children: Snippet } = $props();
 
 	let mobileNavOpen = $state(false);
+
+	const isApi = $derived(
+		page.url.pathname === '/docs/api' || page.url.pathname.startsWith('/docs/api/')
+	);
 
 	afterNavigate(() => {
 		mobileNavOpen = false;
@@ -16,16 +22,7 @@
 </script>
 
 <div class="marketing-home px-4">
-	<div class="cf-frame mx-auto flex min-h-[calc(100dvh-3.25rem)] w-full max-w-6xl">
-		<span class="cf-mark cf-mark-tl" aria-hidden="true"></span>
-		<span class="cf-mark cf-mark-tr" aria-hidden="true"></span>
-		<span class="cf-mark cf-mark-bl" aria-hidden="true"></span>
-		<span class="cf-mark cf-mark-br" aria-hidden="true"></span>
-		<span class="cf-mark cf-mark-docs-split-t hidden md:block" aria-hidden="true"></span>
-		<span class="cf-mark cf-mark-docs-split-b hidden md:block" aria-hidden="true"></span>
-		<span class="cf-mark cf-mark-ml hidden md:block" aria-hidden="true"></span>
-		<span class="cf-mark cf-mark-mr hidden md:block" aria-hidden="true"></span>
-
+	<CfFrame marks="docs" class="mx-auto flex min-h-[calc(100dvh-3.25rem)] w-full max-w-6xl">
 		<aside class="hidden w-52 shrink-0 border-r border-border md:block lg:w-56">
 			<div class="sticky top-[3.25rem] py-8 pr-6 pl-4">
 				<DocsSidebar />
@@ -53,14 +50,14 @@
 					{/if}
 				</div>
 
-				<article class="docs-prose max-w-3xl">
+				<article class="docs-prose w-full {isApi ? 'max-w-6xl' : 'max-w-3xl'}">
 					{@render children()}
 				</article>
 			</div>
 
 			<DocsPager />
 		</div>
-	</div>
+	</CfFrame>
 </div>
 
 <style>

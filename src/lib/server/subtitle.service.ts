@@ -6,13 +6,9 @@ import type { SearchQuery, SubtitleDto } from '#lib/subtitles/dto.js';
 import { Service } from './base.service';
 import type { CacheLookupKey, StoredSubtitleHit } from './cache.service';
 import { CacheService } from './cache.service';
-import {
-	getProvider,
-	getProviderHealth,
-	listSources,
-	recordProviderHealth,
-	resolveProviders
-} from './providers/index';
+import type { MediaRecord } from './media.service';
+import { MediaService } from './media.service';
+import { getProvider, recordProviderHealth, resolveProviders } from './providers/index';
 import { OpenSubtitlesProvider } from './providers/opensubtitles';
 import type { ProviderHit } from './providers/types';
 import type { AppError } from './result';
@@ -22,9 +18,56 @@ import type { ResolvedMedia } from './tmdb.service';
 import { TmdbService } from './tmdb.service';
 
 const PROVIDER_TIMEOUT_MS = 12_000;
-const DOWNLOAD_CONCURRENCY = 5;
-/** Rows to keep per search (files downloaded eagerly on scrape). */
+/** Parallel downloads for non-OpenSubtitles providers. */
+const DOWNLOAD_CONCURRENCY = 3;
+/** OpenSubtitles CAPTCHA/rate-limits hard when parallelized. */
+const OPENSUBTITLES_DOWNLOAD_CONCURRENCY = 1;
+const OPENSUBTITLES_DOWNLOAD_GAP_MS = 1_500;
+/** Cap stored rows per search after a fair merge across providers. */
 const MAX_HITS = 40;
+/** Prefer having files over empty OpenSubtitles metadata. */
+const MAX_HITS_PER_PROVIDER = 12;
+
+const DAY_MS = 86_400_000;
+/** When a scrape finds hits but stores no files (CAPTCHA/429), retry after this. */
+const FAILED_DOWNLOAD_RETRY_MS = 15 * 60_000;
+
+/**
+ * TTL based on media release date:
+ * - < 30 days: 1 day
+ * - < 1 year: 7 days
+ * - < 5 years: 30 days
+ * - older / unknown: 90 days
+ */
+export function scrapeTtlMs(releaseDate: string | null | undefined): number {
+	if (!releaseDate) return 90 * DAY_MS;
+
+	const released = new Date(releaseDate).getTime();
+	if (!Number.isFinite(released)) return 90 * DAY_MS;
+
+	const ageMs = Date.now() - released;
+	if (ageMs < 30 * DAY_MS) return 1 * DAY_MS;
+	if (ageMs < 365 * DAY_MS) return 7 * DAY_MS;
+	if (ageMs < 5 * 365 * DAY_MS) return 30 * DAY_MS;
+	return 90 * DAY_MS;
+}
+
+function isStale(lastFetchedAt: string, releaseDate: string | null | undefined): boolean {
+	const fetched = new Date(lastFetchedAt).getTime();
+	if (!Number.isFinite(fetched) || fetched <= 0) return true;
+	return Date.now() - fetched >= scrapeTtlMs(releaseDate);
+}
+
+function hasStoredFile(record: RecordModel): boolean {
+	const file = record.file;
+	return typeof file === 'string' ? file.length > 0 : Boolean(file);
+}
+
+function shouldRetryEmptyFiles(lastFetchedAt: string): boolean {
+	const fetched = new Date(lastFetchedAt).getTime();
+	if (!Number.isFinite(fetched) || fetched <= 0) return true;
+	return Date.now() - fetched >= FAILED_DOWNLOAD_RETRY_MS;
+}
 
 export class SubtitleService extends Service {
 	private cache() {
@@ -35,50 +78,61 @@ export class SubtitleService extends Service {
 		return new TmdbService();
 	}
 
-	sources() {
-		return listSources();
-	}
-
-	status() {
-		return getProviderHealth();
+	private media() {
+		return new MediaService();
 	}
 
 	search(query: SearchQuery): RA<SubtitleDto[], AppError> {
 		const language = query.lang.toLowerCase();
-		const sources = query.sources
-			? query.sources
-					.split(',')
-					.map((s) => s.trim())
-					.filter(Boolean)
-			: ['all'];
 
 		const resolveMedia = query.imdb
 			? this.tmdb().resolveByImdbId(query.imdb)
 			: this.tmdb().resolveByTmdbId(query.tmdb!, query.type);
 
-		return resolveMedia.andThen((media) => {
+		return resolveMedia.andThen((resolved) => {
 			const key: CacheLookupKey = {
-				imdbId: media.imdbId ?? query.imdb?.toLowerCase() ?? null,
-				tmdbId: media.tmdbId || query.tmdb || null,
+				imdbId: resolved.imdbId ?? query.imdb?.toLowerCase() ?? null,
+				tmdbId: resolved.tmdbId || query.tmdb || null,
 				season: query.s ?? null,
 				episode: query.e ?? null,
 				language
 			};
 
-			const mediaType = query.type ?? (query.s != null || query.e != null ? 'tv' : media.type);
+			const mediaType = query.type ?? (query.s != null || query.e != null ? 'tv' : resolved.type);
 
-			if (!query.refresh) {
-				return this.cache()
-					.findByKey(key)
-					.andThen((rows) => {
-						if (rows.length === 0) {
-							return this.fetchAndStore(key, sources, media, mediaType, language);
-						}
-						return okAsync(rows.map((r) => this.toDto(r)));
-					});
-			}
+			return this.media()
+				.upsertFromResolved(resolved)
+				.andThen((mediaRecord) =>
+					this.cache()
+						.findSearchByKey(key)
+						.andThen((search) =>
+							this.cache()
+								.findByKey(key)
+								.andThen((rows) => {
+									const releaseDate = mediaRecord?.releaseDate ?? resolved.releaseDate ?? null;
+									const rowsWithFiles = rows.filter(hasStoredFile);
 
-			return this.fetchAndStore(key, sources, media, mediaType, language);
+									let shouldScrape = false;
+									if (!search) {
+										shouldScrape = true;
+									} else if (key.imdbId && isStale(search.lastFetchedAt, releaseDate)) {
+										shouldScrape = true;
+									} else if (
+										rowsWithFiles.length === 0 &&
+										shouldRetryEmptyFiles(search.lastFetchedAt)
+									) {
+										// Prior scrape stored no files (e.g. CAPTCHA) — retry.
+										shouldScrape = true;
+									}
+
+									if (!shouldScrape) {
+										return okAsync(rowsWithFiles.map((r) => this.toDto(r)));
+									}
+
+									return this.fetchAndStore(key, resolved, mediaType, language, mediaRecord);
+								})
+						)
+				);
 		});
 	}
 
@@ -160,7 +214,7 @@ export class SubtitleService extends Service {
 				return this.cache().attachFile(
 					record.id,
 					normalized,
-					(record.fileName as string | null | undefined) ?? `${providerId}-${externalId}`
+					(record.release as string | null | undefined) ?? `${providerId}-${externalId}`
 				);
 			} catch (e) {
 				return errAsync(
@@ -176,12 +230,12 @@ export class SubtitleService extends Service {
 
 	private fetchAndStore(
 		key: CacheLookupKey,
-		sources: string[],
 		media: ResolvedMedia,
 		mediaType: 'movie' | 'tv',
-		language: string
+		language: string,
+		mediaRecord: MediaRecord | null
 	): RA<SubtitleDto[], AppError> {
-		const providers = resolveProviders(sources).filter((p) =>
+		const providers = resolveProviders().filter((p) =>
 			mediaType === 'tv' ? p.supports.tv : p.supports.movies
 		);
 
@@ -241,32 +295,50 @@ export class SubtitleService extends Service {
 		});
 
 		return RA.combine(searches)
-			.map((groups) => this.dedupe(groups.flat()).slice(0, MAX_HITS))
+			.map((groups) => this.mergeHits(groups))
 			.andThen((hits) => this.downloadHits(hits))
-			.andThen((stored) =>
-				this.cache()
-					.replaceByKey(key, { ...media, mediaType }, stored)
-					.map((rows) => rows.map((r) => this.toDto(r)))
-			);
+			.andThen((stored) => {
+				const withFiles = stored.filter((hit) => hit.bytes != null && hit.bytes.length > 0);
+				return this.cache()
+					.getOrCreateSearch(key, mediaRecord?.id ?? null)
+					.andThen((search) =>
+						this.cache()
+							.deleteEmptyByKey(key)
+							.andThen(() => this.cache().insertNewHits(key, { ...media, mediaType }, withFiles))
+							.andThen(() => this.cache().touchSearch(search.id))
+							.andThen(() => this.cache().findByKey(key))
+							.map((rows) => rows.filter(hasStoredFile).map((r) => this.toDto(r)))
+					);
+			});
 	}
 
 	private downloadHits(hits: ProviderHit[]): RA<StoredSubtitleHit[], AppError> {
 		return RA.fromPromise(
-			this.mapWithConcurrency(hits, DOWNLOAD_CONCURRENCY, async (hit) => {
-				const provider = getProvider(hit.provider);
-				if (!provider) {
-					return { ...hit, bytes: null };
+			(async () => {
+				const opensubtitles: ProviderHit[] = [];
+				const others: ProviderHit[] = [];
+				for (const hit of hits) {
+					if (hit.provider === 'opensubtitles') opensubtitles.push(hit);
+					else others.push(hit);
 				}
-				const result = await provider.downloadByExternalId(hit.externalId, hit.rawUrl ?? null);
-				if (result.isErr()) {
-					return { ...hit, bytes: null };
-				}
-				try {
-					return { ...hit, bytes: ensureSubtitleBytes(result.value) };
-				} catch {
-					return { ...hit, bytes: null };
-				}
-			}),
+
+				const otherResults = await this.mapWithConcurrency(others, DOWNLOAD_CONCURRENCY, (hit) =>
+					this.downloadOne(hit)
+				);
+				const osResults = await this.mapWithConcurrency(
+					opensubtitles,
+					OPENSUBTITLES_DOWNLOAD_CONCURRENCY,
+					async (hit) => {
+						const result = await this.downloadOne(hit);
+						if (OPENSUBTITLES_DOWNLOAD_GAP_MS > 0) {
+							await new Promise((r) => setTimeout(r, OPENSUBTITLES_DOWNLOAD_GAP_MS));
+						}
+						return result;
+					}
+				);
+
+				return [...otherResults, ...osResults];
+			})(),
 			(e) =>
 				httpError(
 					ERROR_CODE.SCRAPE_FAILED,
@@ -276,11 +348,46 @@ export class SubtitleService extends Service {
 		);
 	}
 
+	private async downloadOne(hit: ProviderHit): Promise<StoredSubtitleHit> {
+		const provider = getProvider(hit.provider);
+		if (!provider) {
+			return { ...hit, bytes: null };
+		}
+		const result = await provider.downloadByExternalId(hit.externalId, hit.rawUrl ?? null);
+		if (result.isErr()) {
+			return { ...hit, bytes: null };
+		}
+		try {
+			return { ...hit, bytes: ensureSubtitleBytes(result.value) };
+		} catch {
+			return { ...hit, bytes: null };
+		}
+	}
+
+	private mergeHits(groups: ProviderHit[][]): ProviderHit[] {
+		const capped = groups.map((group) => this.dedupe(group).slice(0, MAX_HITS_PER_PROVIDER));
+		const roundRobin: ProviderHit[] = [];
+		let index = 0;
+		let added = true;
+		while (added && roundRobin.length < MAX_HITS) {
+			added = false;
+			for (const group of capped) {
+				if (index < group.length && roundRobin.length < MAX_HITS) {
+					roundRobin.push(group[index]!);
+					added = true;
+				}
+			}
+			index += 1;
+		}
+		return this.dedupe(roundRobin);
+	}
+
 	private async mapWithConcurrency<T, R>(
 		items: T[],
 		concurrency: number,
 		fn: (item: T) => Promise<R>
 	): Promise<R[]> {
+		if (items.length === 0) return [];
 		const results: R[] = new Array(items.length);
 		let next = 0;
 
@@ -298,12 +405,14 @@ export class SubtitleService extends Service {
 	private dedupe(hits: ProviderHit[]): ProviderHit[] {
 		const seen = new Set<string>();
 		const out: ProviderHit[] = [];
+
 		for (const hit of hits) {
 			const k = `${hit.provider}:${hit.externalId}`;
 			if (seen.has(k)) continue;
 			seen.add(k);
 			out.push(hit);
 		}
+
 		return out;
 	}
 
@@ -314,7 +423,6 @@ export class SubtitleService extends Service {
 			language: String(record.language),
 			format: String(record.format ?? 'vtt'),
 			release: (record.release as string) ?? null,
-			fileName: (record.fileName as string) ?? null,
 			downloadUrl: r2Url ?? `/api/subtitles/${record.id}`
 		};
 	}

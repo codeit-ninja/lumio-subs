@@ -260,7 +260,7 @@ export class OpenSubtitlesProvider implements SubtitleProvider {
 							});
 						}
 
-						return hits.slice(0, 40);
+						return hits.slice(0, 12);
 					}
 				);
 			});

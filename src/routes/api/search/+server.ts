@@ -1,5 +1,3 @@
-import { json } from '@sveltejs/kit';
-
 import { apiError, apiValidationError } from '#lib/server/api-response.js';
 import { searchQuerySchema } from '#lib/subtitles/dto.js';
 
@@ -12,8 +10,6 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		s: url.searchParams.get('s') ?? undefined,
 		e: url.searchParams.get('e') ?? undefined,
 		lang: url.searchParams.get('lang') ?? undefined,
-		sources: url.searchParams.get('sources') ?? undefined,
-		refresh: url.searchParams.get('refresh') ?? undefined,
 		type: url.searchParams.get('type') ?? undefined
 	});
 
@@ -26,5 +22,5 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		return apiError(result.error);
 	}
 
-	return json({ results: result.value });
+	return Response.json({ results: result.value });
 };
